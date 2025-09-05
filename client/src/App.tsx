@@ -28,7 +28,7 @@ function App() {
       <TooltipProvider>
         <div className="flex h-screen bg-slate-50">
           <Sidebar />
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto">
             <Router />
           </div>
         </div>

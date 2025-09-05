@@ -72,7 +72,7 @@ export default function Statistics() {
     .slice(0, 5);
 
   return (
-    <div className="flex-1 overflow-auto" data-testid="statistics-page">
+    <div className="min-h-full" data-testid="statistics-page">
       <div className="p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
