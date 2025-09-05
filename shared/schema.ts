@@ -37,11 +37,24 @@ export const followUps = pgTable("follow_ups", {
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
+}).extend({
+  name: z.string().min(1, "Le nom est requis"),
+  company: z.string().min(1, "L'entreprise est requise"),
+  email: z.string().email("Email invalide").min(1, "L'email est requis"),
+  phone: z.string().optional(),
+  position: z.string().optional(),
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes).omit({
   id: true,
   createdAt: true,
+}).extend({
+  reference: z.string().min(1, "La référence est requise"),
+  clientId: z.string().min(1, "Le client est requis"),
+  description: z.string().min(1, "La description est requise"),
+  amount: z.string().min(1, "Le montant est requis"),
+  sentDate: z.string().min(1, "La date d'envoi est requise"),
+  notes: z.string().optional(),
 });
 
 export const insertFollowUpSchema = createInsertSchema(followUps).omit({
