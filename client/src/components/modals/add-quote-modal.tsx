@@ -220,6 +220,7 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
                       placeholder="Notes internes..."
                       rows={2}
                       {...field}
+                      value={field.value || ""}
                       data-testid="textarea-quote-notes"
                     />
                   </FormControl>

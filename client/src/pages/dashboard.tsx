@@ -10,7 +10,7 @@ export default function Dashboard() {
     queryKey: ["/api/quotes"],
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/statistics"],
   });
 
@@ -85,7 +85,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-slate-500">Total Devis</p>
                   <p className="text-2xl font-bold text-slate-900" data-testid="total-quotes">
-                    {stats?.total || 0}
+                    {stats?.total ?? 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
@@ -105,7 +105,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-slate-500">En Attente</p>
                   <p className="text-2xl font-bold text-slate-900" data-testid="pending-quotes">
-                    {stats?.byStatus["En attente"] || 0}
+                    {stats?.byStatus?.["En attente"] ?? 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">

@@ -132,6 +132,7 @@ export default function AddClientModal({ open, onOpenChange }: AddClientModalPro
                       type="tel" 
                       placeholder="+33 1 23 45 67 89" 
                       {...field}
+                      value={field.value || ""}
                       data-testid="input-client-phone"
                     />
                   </FormControl>
@@ -150,6 +151,7 @@ export default function AddClientModal({ open, onOpenChange }: AddClientModalPro
                     <Input 
                       placeholder="Directeur, CEO, etc." 
                       {...field}
+                      value={field.value || ""}
                       data-testid="input-client-position"
                     />
                   </FormControl>

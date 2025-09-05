@@ -1,0 +1,49 @@
+The above error occurred in the <RevenueChart> component:
+
+    at RevenueChart (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/charts/revenue-chart.tsx:21:40)
+    at div
+    at div
+    at _c9 (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at div
+    at Statistics (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/pages/statistics.tsx:28:52)
+    at Route (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=4f583e3e:323:16)
+    at Switch (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=4f583e3e:379:17)
+    at Router
+    at div
+    at div
+    at Provider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-XKNQWAH5.js?v=5c6fb07f:58:15)
+    at TooltipProvider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=907166c2:56:5)
+    at QueryClientProvider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=03523fad:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+The above error occurred in the <FollowupChart> component:
+
+    at FollowupChart (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/charts/followup-chart.tsx:23:21)
+    at div
+    at div
+    at _c9 (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at div
+    at Statistics (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/src/pages/statistics.tsx:28:52)
+    at Route (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=4f583e3e:323:16)
+    at Switch (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=4f583e3e:379:17)
+    at Router
+    at div
+    at div
+    at Provider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-XKNQWAH5.js?v=5c6fb07f:58:15)
+    at TooltipProvider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=907166c2:56:5)
+    at QueryClientProvider (https://2024794e-a7d0-4391-b1a0-d285946cd806-00-autfmv67x0dl.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=03523fad:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+"doughnut" is not a registered controller.

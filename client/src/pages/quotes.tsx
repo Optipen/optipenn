@@ -18,10 +18,10 @@ export default function Quotes() {
   const { toast } = useToast();
 
   const { data: quotes = [], isLoading } = useQuery<QuoteWithClient[]>({
-    queryKey: ["/api/quotes", { status: statusFilter }],
+    queryKey: ["/api/quotes", { status: statusFilter === "all" ? "" : statusFilter }],
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<any>({
     queryKey: ["/api/statistics"],
   });
 
@@ -172,7 +172,7 @@ export default function Quotes() {
                     <SelectValue placeholder="Tous les statuts" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Tous les statuts</SelectItem>
+                    <SelectItem value="all">Tous les statuts</SelectItem>
                     <SelectItem value="Envoyé">Envoyé</SelectItem>
                     <SelectItem value="En attente">En attente</SelectItem>
                     <SelectItem value="Relancé">Relancé</SelectItem>

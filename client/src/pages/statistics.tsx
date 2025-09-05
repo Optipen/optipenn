@@ -9,7 +9,7 @@ import FollowupChart from "@/components/charts/followup-chart";
 import type { QuoteWithClient } from "@shared/schema";
 
 export default function Statistics() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/statistics"],
   });
 

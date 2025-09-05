@@ -67,6 +67,8 @@ export class MemStorage implements IStorage {
     const client: Client = { 
       ...insertClient, 
       id, 
+      phone: insertClient.phone || null,
+      position: insertClient.position || null,
       createdAt: new Date() 
     };
     this.clients.set(id, client);
@@ -130,6 +132,9 @@ export class MemStorage implements IStorage {
     const quote: Quote = { 
       ...insertQuote, 
       id, 
+      status: insertQuote.status || "Envoyé",
+      notes: insertQuote.notes || null,
+      lastFollowUpDate: insertQuote.lastFollowUpDate || null,
       createdAt: new Date() 
     };
     this.quotes.set(id, quote);
@@ -169,6 +174,7 @@ export class MemStorage implements IStorage {
     const followUp: FollowUp = { 
       ...insertFollowUp, 
       id, 
+      comment: insertFollowUp.comment || null,
       createdAt: new Date() 
     };
     this.followUps.set(id, followUp);
