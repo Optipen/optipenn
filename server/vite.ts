@@ -8,14 +8,19 @@ import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
+export function log(message: string, source = "express", meta?: Record<string, unknown>) {
+  const now = new Date();
+  if (process.env.NODE_ENV === "production") {
+    const payload = { ts: now.toISOString(), source, message, ...(meta || {}) };
+    console.log(JSON.stringify(payload));
+    return;
+  }
+  const formattedTime = now.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 

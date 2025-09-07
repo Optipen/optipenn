@@ -1,20 +1,29 @@
+// @ts-ignore
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+// CORS if needed (configure origin via env)
+const allowOrigin = process.env.CORS_ORIGIN;
+if (allowOrigin) {
+  app.use(cors({ origin: allowOrigin.split(",").map((s) => s.trim()), credentials: true }));
+}
 
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  res.json = function (bodyJson: any, ...args: any[]) {
     capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+    return originalResJson.call(res, bodyJson);
   };
 
   res.on("finish", () => {
@@ -38,13 +47,28 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+  // start schedulers
+  try {
+    const { startSchedulers } = await import("./notifications");
+    startSchedulers();
+  } catch {}
+
+  // Validate environment in production
+  if (app.get("env") === "production") {
+    const required = ["DATABASE_URL", "JWT_SECRET"] as const;
+    const missing = required.filter((k) => !process.env[k]);
+    if (missing.length) {
+      throw new Error(`Variables d'environnement manquantes: ${missing.join(", ")}`);
+    }
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    // eslint-disable-next-line no-console
+    console.error(err);
   });
 
   // importantly only setup vite in development and after
@@ -61,11 +85,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, () => {
     log(`serving on port ${port}`);
   });
 })();

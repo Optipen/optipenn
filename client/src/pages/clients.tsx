@@ -8,16 +8,23 @@ import { Search, Filter, Plus, Edit, Eye, Trash2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddClientModal from "@/components/modals/add-client-modal";
+import EditClientModal from "@/components/modals/edit-client-modal";
 import type { Client } from "@shared/schema";
 
 export default function Clients() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const { toast } = useToast();
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["/api/clients", { search }],
+    queryKey: ["/api/clients", { search, page, pageSize }],
   });
+
+  // Aucune donnée devis nécessaire ici
 
   const deleteClientMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/clients/${id}`),
@@ -43,6 +50,11 @@ export default function Clients() {
     }
   };
 
+  const handleOpenEdit = (client: Client) => {
+    setSelectedClient(client);
+    setShowEditModal(true);
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -51,6 +63,8 @@ export default function Clients() {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Pas de calcul de relance prévue dans Clients
 
   if (isLoading) {
     return (
@@ -184,6 +198,7 @@ export default function Clients() {
                             variant="ghost" 
                             size="sm" 
                             className="text-blue-600 hover:text-blue-700"
+                            onClick={() => handleOpenEdit(client)}
                             data-testid={`button-edit-${client.id}`}
                           >
                             <Edit className="w-4 h-4" />
@@ -215,11 +230,21 @@ export default function Clients() {
             </table>
           </div>
         </Card>
+        <div className="flex justify-center mt-4">
+          <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Précédent</Button>
+          <span className="mx-3 text-sm text-slate-600">Page {page}</span>
+          <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={clients.length < pageSize}>Suivant</Button>
+        </div>
       </div>
 
       <AddClientModal 
         open={showAddModal} 
         onOpenChange={setShowAddModal}
+      />
+      <EditClientModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        client={selectedClient}
       />
     </div>
   );

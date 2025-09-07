@@ -68,8 +68,25 @@ export default function Statistics() {
   }, {});
 
   const sortedTopClients = Object.values(topClients)
+    .filter((client: any) => client.totalRevenue > 0) // Only show clients with revenue
     .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
     .slice(0, 5);
+
+  // Calculate average response time for accepted quotes
+  const acceptedQuotes = quotes.filter(quote => quote.status === "Accepté");
+  const avgResponseTime = acceptedQuotes.length > 0 
+    ? acceptedQuotes.reduce((sum, quote) => {
+        const sentDate = new Date(quote.sentDate);
+        const acceptedDate = new Date(); // Assuming accepted today for simplicity
+        const daysDiff = Math.floor((acceptedDate.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+        return sum + daysDiff;
+      }, 0) / acceptedQuotes.length
+    : null;
+
+  // Calculate follow-up effectiveness
+  const totalQuotes = quotes.length;
+  const quotesWithFollowUps = quotes.filter(quote => quote.lastFollowUpDate).length;
+  const followUpEffectiveness = totalQuotes > 0 ? (quotesWithFollowUps / totalQuotes) * 100 : 0;
 
   return (
     <div className="min-h-full" data-testid="statistics-page">
@@ -93,7 +110,7 @@ export default function Statistics() {
                 <SelectItem value="year">Année en cours</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="flex items-center space-x-2" data-testid="button-export-pdf">
+            <Button variant="outline" className="flex items-center space-x-2" data-testid="button-export-pdf" onClick={() => window.open("/api/export/quotes.pdf", "_blank")}>
               <Download className="w-4 h-4" />
               <span>Export PDF</span>
             </Button>
@@ -112,8 +129,7 @@ export default function Statistics() {
                 {stats?.conversionRate ? `${stats.conversionRate.toFixed(1)}%` : "0%"}
               </div>
               <div className="flex items-center text-sm">
-                <span className="text-green-600 font-medium">+5.1%</span>
-                <span className="text-slate-500 ml-2">vs mois dernier</span>
+                <span className="text-slate-500">Calculé en temps réel</span>
               </div>
             </CardContent>
           </Card>
@@ -125,11 +141,12 @@ export default function Statistics() {
                 <Clock className="text-blue-600 w-5 h-5" />
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-2" data-testid="avg-response-time">
-                4.2 jours
+                {avgResponseTime ? `${avgResponseTime.toFixed(1)} jours` : "N/A"}
               </div>
               <div className="flex items-center text-sm">
-                <span className="text-green-600 font-medium">-0.8 j</span>
-                <span className="text-slate-500 ml-2">vs mois dernier</span>
+                <span className="text-slate-500">
+                  {avgResponseTime ? "Basé sur les devis acceptés" : "Aucun devis accepté"}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -144,8 +161,7 @@ export default function Statistics() {
                 €{stats?.averageAmount ? Math.round(stats.averageAmount).toLocaleString() : "0"}
               </div>
               <div className="flex items-center text-sm">
-                <span className="text-green-600 font-medium">+12%</span>
-                <span className="text-slate-500 ml-2">vs mois dernier</span>
+                <span className="text-slate-500">Basé sur vos devis</span>
               </div>
             </CardContent>
           </Card>
@@ -157,11 +173,12 @@ export default function Statistics() {
                 <Send className="text-purple-600 w-5 h-5" />
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-2" data-testid="followup-effectiveness">
-                84%
+                {followUpEffectiveness.toFixed(0)}%
               </div>
               <div className="flex items-center text-sm">
-                <span className="text-green-600 font-medium">+2.3%</span>
-                <span className="text-slate-500 ml-2">vs mois dernier</span>
+                <span className="text-slate-500">
+                  {quotesWithFollowUps} relances sur {totalQuotes} devis
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -224,7 +241,7 @@ export default function Statistics() {
                       {(stats?.byStatus?.["En attente"] || 0) + (stats?.byStatus?.["Relancé"] || 0)}
                     </div>
                     <div className="text-sm text-slate-500">
-                      {stats?.total ? Math.round(((stats.byStatus["En attente"] + stats.byStatus["Relancé"]) / stats.total) * 100) : 0}%
+                      {stats?.total ? Math.round((((stats.byStatus["En attente"] || 0) + (stats.byStatus["Relancé"] || 0)) / stats.total) * 100) : 0}%
                     </div>
                   </div>
                 </div>
@@ -252,7 +269,7 @@ export default function Statistics() {
             </div>
             <CardContent className="p-6">
               <div className="chart-container">
-                <FollowupChart />
+                <FollowupChart data={{}} />
               </div>
             </CardContent>
           </Card>

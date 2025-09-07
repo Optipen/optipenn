@@ -1,0 +1,1321 @@
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Relances de Devis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                },
+                fontFamily: {
+                    sans: ["Inter", "system-ui", "sans-serif"],
+                }
+            },
+        }
+    };
+    </script>
+    <style>
+        :root {
+            --background: 248 250 252;
+            --foreground: 15 23 42;
+            --card: 255 255 255;
+            --card-foreground: 15 23 42;
+            --popover: 255 255 255;
+            --popover-foreground: 15 23 42;
+            --primary: 59 130 246;
+            --primary-foreground: 248 250 252;
+            --secondary: 226 232 240;
+            --secondary-foreground: 30 41 59;
+            --muted: 241 245 249;
+            --muted-foreground: 100 116 139;
+            --accent: 226 232 240;
+            --accent-foreground: 30 41 59;
+            --destructive: 220 38 38;
+            --destructive-foreground: 248 250 252;
+            --border: 226 232 240;
+            --input: 226 232 240;
+            --ring: 59 130 246;
+            --radius: 8px;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="h-full bg-background font-sans">
+    <!-- Notification Toast -->
+    <div id="notification" class="fixed top-4 right-4 z-50 hidden">
+        <div class="bg-primary text-primary-foreground px-4 py-3 rounded-lg shadow-lg border border-border">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-check-circle"></i>
+                <span id="notification-text">Action réalisée avec succès</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex h-full">
+        <!-- Sidebar Navigation -->
+        <!-- @COMPONENT: Sidebar [navigation component] -->
+        <div class="w-64 bg-card border-r border-border flex flex-col">
+            <div class="p-6 border-b border-border">
+                <h1 class="text-xl font-bold text-foreground">Gestion Devis</h1>
+                <p class="text-sm text-muted-foreground mt-1">Suivi des relances</p>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="#dashboard" data-view="dashboard" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-primary bg-primary/10 font-medium">
+                    <i class="fas fa-home w-5"></i>
+                    <span>Tableau de bord</span>
+                </a>
+                <a href="#clients" data-view="clients" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Clients</span>
+                </a>
+                <a href="#quotes" data-view="quotes" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-file-invoice w-5"></i>
+                    <span>Devis</span>
+                </a>
+                <a href="#statistics" data-view="statistics" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-chart-bar w-5"></i>
+                    <span>Statistiques</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <i class="fas fa-user text-primary text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-foreground">Admin</p>
+                        <p class="text-xs text-muted-foreground">admin@company.com</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Dashboard View -->
+            <!-- @COMPONENT: DashboardView [main dashboard with overview metrics] -->
+            <div id="dashboard-view" class="view-content flex-1 overflow-auto">
+                <div class="p-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-bold text-foreground">Tableau de bord</h2>
+                            <p class="text-muted-foreground mt-1">Vue d'ensemble de vos devis et relances</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <!-- @FUNCTIONALITY: Should show current date and refresh data -->
+                            <div class="text-sm text-muted-foreground">
+                                Dernière mise à jour: <span class="font-medium">Il y a 2 min</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Total Devis</p>
+                                    <p class="text-2xl font-bold text-foreground">127</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <i class="fas fa-file-invoice text-primary"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center text-sm">
+                                <span class="text-green-600 font-medium">+12%</span>
+                                <span class="text-muted-foreground ml-2">par rapport au mois dernier</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">En Attente</p>
+                                    <p class="text-2xl font-bold text-foreground">23</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                                    <i class="fas fa-clock text-amber-600"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center text-sm">
+                                <span class="text-amber-600 font-medium">5 à relancer</span>
+                                <span class="text-muted-foreground ml-2">cette semaine</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Taux Conversion</p>
+                                    <p class="text-2xl font-bold text-foreground">68%</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                                    <i class="fas fa-percentage text-green-600"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center text-sm">
+                                <span class="text-green-600 font-medium">+5%</span>
+                                <span class="text-muted-foreground ml-2">ce mois-ci</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">CA Potentiel</p>
+                                    <p class="text-2xl font-bold text-foreground">€847K</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-euro-sign text-blue-600"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex items-center text-sm">
+                                <span class="text-blue-600 font-medium">€156K</span>
+                                <span class="text-muted-foreground ml-2">acceptés ce mois</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity & Quick Actions -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Recent Quotes -->
+                        <div class="bg-card rounded-lg border border-border">
+                            <div class="p-6 border-b border-border">
+                                <h3 class="text-lg font-semibold text-foreground">Devis Récents</h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="space-y-4">
+                                    <!-- @MAP: recentQuotes.map(quote => ( -->
+                                    <div class="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                                <span class="text-sm font-medium text-muted-foreground">TM</span>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Techno Marketing</p>
+                                                <p class="text-sm text-muted-foreground">Site e-commerce</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-medium text-foreground">€15,400</p>
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">En attente</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                                <span class="text-sm font-medium text-muted-foreground">IP</span>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Innovation Plus</p>
+                                                <p class="text-sm text-muted-foreground">Application mobile</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-medium text-foreground">€28,900</p>
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepté</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between py-3 border-b border-border last:border-b-0">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                                <span class="text-sm font-medium text-muted-foreground">DS</span>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Digital Solutions</p>
+                                                <p class="text-sm text-muted-foreground">Refonte site web</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-medium text-foreground">€8,750</p>
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Relancé</span>
+                                        </div>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pending Follow-ups -->
+                        <div class="bg-card rounded-lg border border-border">
+                            <div class="p-6 border-b border-border">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold text-foreground">Relances à Effectuer</h3>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">5 urgentes</span>
+                                </div>
+                            </div>
+                            <div class="p-6">
+                                <div class="space-y-4">
+                                    <!-- @MAP: pendingFollowups.map(followup => ( -->
+                                    <div class="flex items-center justify-between p-4 rounded-lg bg-red-50 border border-red-200">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Créa Studio</p>
+                                                <p class="text-sm text-muted-foreground">Devis en retard de 3 jours</p>
+                                            </div>
+                                        </div>
+                                        <button class="px-3 py-1 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                            Relancer
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center justify-between p-4 rounded-lg bg-amber-50 border border-amber-200">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Web Agency Pro</p>
+                                                <p class="text-sm text-muted-foreground">À relancer aujourd'hui</p>
+                                            </div>
+                                        </div>
+                                        <button class="px-3 py-1 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                            Relancer
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center justify-between p-4 rounded-lg bg-blue-50 border border-blue-200">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                                            <div>
+                                                <p class="font-medium text-foreground">Start-up Innov</p>
+                                                <p class="text-sm text-muted-foreground">À relancer demain</p>
+                                            </div>
+                                        </div>
+                                        <button class="px-3 py-1 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/80 transition-colors">
+                                            Programmer
+                                        </button>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: DashboardView -->
+
+            <!-- Clients View -->
+            <!-- @COMPONENT: ClientsView [client management interface] -->
+            <div id="clients-view" class="view-content hidden flex-1 overflow-auto">
+                <div class="p-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-bold text-foreground">Gestion des Clients</h2>
+                            <p class="text-muted-foreground mt-1">Gérez votre portefeuille client</p>
+                        </div>
+                        <button id="add-client-btn" class="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center space-x-2">
+                            <i class="fas fa-plus"></i>
+                            <span>Nouveau Client</span>
+                        </button>
+                    </div>
+
+                    <!-- Search and Filters -->
+                    <div class="bg-card rounded-lg border border-border p-6 mb-6">
+                        <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                                    <input type="text" placeholder="Rechercher par nom ou entreprise..." 
+                                           class="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <select class="px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option>Tous les clients</option>
+                                    <option>Actifs</option>
+                                    <option>Inactifs</option>
+                                </select>
+                                <button class="px-4 py-2 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                                    <i class="fas fa-filter mr-2"></i>Filtres
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clients Table -->
+                    <div class="bg-card rounded-lg border border-border overflow-hidden">
+                        <div class="px-6 py-4 border-b border-border">
+                            <h3 class="text-lg font-semibold text-foreground">Liste des Clients</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-muted/50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Client</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Entreprise</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Contact</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Devis</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Statut</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    <!-- @MAP: clients.map(client => ( -->
+                                    <tr class="hover:bg-muted/50 transition-colors" data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                                                    <span class="text-sm font-medium text-primary">JD</span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-foreground">Jean Dupont</div>
+                                                    <div class="text-sm text-muted-foreground">Directeur</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">Techno Marketing</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-foreground">jean.dupont@technomarketing.fr</div>
+                                            <div class="text-sm text-muted-foreground">+33 1 23 45 67 89</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">3 devis</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Actif</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="text-primary hover:text-primary/80" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="text-muted-foreground hover:text-foreground" title="Voir">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="text-destructive hover:text-destructive/80" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="hover:bg-muted/50 transition-colors" data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                                                    <span class="text-sm font-medium text-primary">ML</span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-foreground">Marie Leroy</div>
+                                                    <div class="text-sm text-muted-foreground">CEO</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">Innovation Plus</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-foreground">marie.leroy@innovationplus.com</div>
+                                            <div class="text-sm text-muted-foreground">+33 6 12 34 56 78</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">5 devis</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Actif</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="text-primary hover:text-primary/80" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="text-muted-foreground hover:text-foreground" title="Voir">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="text-destructive hover:text-destructive/80" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <div class="px-6 py-4 border-t border-border">
+                            <div class="flex items-center justify-between">
+                                <div class="text-sm text-muted-foreground">
+                                    Affichage de 1 à 10 sur 47 clients
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors disabled:opacity-50" disabled>
+                                        Précédent
+                                    </button>
+                                    <button class="px-3 py-1 bg-primary text-primary-foreground rounded-md">1</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">2</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">3</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                                        Suivant
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: ClientsView -->
+
+            <!-- Quotes View -->
+            <!-- @COMPONENT: QuotesView [quote management interface] -->
+            <div id="quotes-view" class="view-content hidden flex-1 overflow-auto">
+                <div class="p-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-bold text-foreground">Gestion des Devis</h2>
+                            <p class="text-muted-foreground mt-1">Suivez et gérez vos devis et relances</p>
+                        </div>
+                        <button id="add-quote-btn" class="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center space-x-2">
+                            <i class="fas fa-plus"></i>
+                            <span>Nouveau Devis</span>
+                        </button>
+                    </div>
+
+                    <!-- Filters and Search -->
+                    <div class="bg-card rounded-lg border border-border p-6 mb-6">
+                        <div class="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                                    <input type="text" placeholder="Rechercher par client ou référence..." 
+                                           class="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <select class="px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option>Tous les statuts</option>
+                                    <option>Envoyé</option>
+                                    <option>En attente</option>
+                                    <option>Relancé</option>
+                                    <option>Accepté</option>
+                                    <option>Refusé</option>
+                                </select>
+                                <select class="px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option>Trier par date</option>
+                                    <option>Trier par montant</option>
+                                    <option>Trier par client</option>
+                                </select>
+                                <button class="px-4 py-2 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                                    <i class="fas fa-download mr-2"></i>Export CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Overview Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <div class="bg-card rounded-lg border border-border p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-600">34</div>
+                            <div class="text-sm text-muted-foreground">Envoyés</div>
+                        </div>
+                        <div class="bg-card rounded-lg border border-border p-4 text-center">
+                            <div class="text-2xl font-bold text-amber-600">23</div>
+                            <div class="text-sm text-muted-foreground">En attente</div>
+                        </div>
+                        <div class="bg-card rounded-lg border border-border p-4 text-center">
+                            <div class="text-2xl font-bold text-orange-600">12</div>
+                            <div class="text-sm text-muted-foreground">Relancés</div>
+                        </div>
+                        <div class="bg-card rounded-lg border border-border p-4 text-center">
+                            <div class="text-2xl font-bold text-green-600">48</div>
+                            <div class="text-sm text-muted-foreground">Acceptés</div>
+                        </div>
+                        <div class="bg-card rounded-lg border border-border p-4 text-center">
+                            <div class="text-2xl font-bold text-red-600">10</div>
+                            <div class="text-sm text-muted-foreground">Refusés</div>
+                        </div>
+                    </div>
+
+                    <!-- Quotes Table -->
+                    <div class="bg-card rounded-lg border border-border overflow-hidden">
+                        <div class="px-6 py-4 border-b border-border">
+                            <h3 class="text-lg font-semibold text-foreground">Liste des Devis</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-muted/50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Référence</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Client</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Montant</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Statut</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    <!-- @MAP: quotes.map(quote => ( -->
+                                    <tr class="hover:bg-muted/50 transition-colors" data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">DEV-2024-001</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-foreground">Techno Marketing</div>
+                                            <div class="text-sm text-muted-foreground">Jean Dupont</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-foreground">Site e-commerce complet</div>
+                                            <div class="text-sm text-muted-foreground">Avec paiement en ligne</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">€15,400</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">15/03/2024</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">En attente</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="text-primary hover:text-primary/80" title="Relancer" data-event="click:followUpQuote">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                                <button class="text-primary hover:text-primary/80" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="text-muted-foreground hover:text-foreground" title="Voir">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="text-destructive hover:text-destructive/80" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="hover:bg-muted/50 transition-colors" data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">DEV-2024-002</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-foreground">Innovation Plus</div>
+                                            <div class="text-sm text-muted-foreground">Marie Leroy</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-foreground">Application mobile iOS/Android</div>
+                                            <div class="text-sm text-muted-foreground">Avec backend API</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">€28,900</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">12/03/2024</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepté</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="text-muted-foreground" title="Accepté" disabled>
+                                                    <i class="fas fa-check-circle"></i>
+                                                </button>
+                                                <button class="text-primary hover:text-primary/80" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="text-muted-foreground hover:text-foreground" title="Voir">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="text-destructive hover:text-destructive/80" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="bg-red-50 hover:bg-red-100 transition-colors" data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">DEV-2024-003</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-foreground">Digital Solutions</div>
+                                            <div class="text-sm text-muted-foreground">Pierre Martin</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-foreground">Refonte site web</div>
+                                            <div class="text-sm text-muted-foreground">Avec système CMS</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">€8,750</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">08/03/2024</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Relancé</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="text-red-600 hover:text-red-700" title="Urgent - Relancer">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                </button>
+                                                <button class="text-primary hover:text-primary/80" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="text-muted-foreground hover:text-foreground" title="Voir">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="text-destructive hover:text-destructive/80" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <div class="px-6 py-4 border-t border-border">
+                            <div class="flex items-center justify-between">
+                                <div class="text-sm text-muted-foreground">
+                                    Affichage de 1 à 10 sur 127 devis
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors disabled:opacity-50" disabled>
+                                        Précédent
+                                    </button>
+                                    <button class="px-3 py-1 bg-primary text-primary-foreground rounded-md">1</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">2</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">3</button>
+                                    <button class="px-3 py-1 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                                        Suivant
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: QuotesView -->
+
+            <!-- Statistics View -->
+            <!-- @COMPONENT: StatisticsView [analytics and charts dashboard] -->
+            <div id="statistics-view" class="view-content hidden flex-1 overflow-auto">
+                <div class="p-8">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-bold text-foreground">Statistiques</h2>
+                            <p class="text-muted-foreground mt-1">Analysez vos performances et conversions</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <select class="px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option>30 derniers jours</option>
+                                <option>3 derniers mois</option>
+                                <option>6 derniers mois</option>
+                                <option>Année en cours</option>
+                            </select>
+                            <button class="px-4 py-2 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                                <i class="fas fa-download mr-2"></i>Export PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-medium text-muted-foreground">Taux de Conversion</h3>
+                                <i class="fas fa-percentage text-green-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-foreground mb-2">68.2%</div>
+                            <div class="flex items-center text-sm">
+                                <span class="text-green-600 font-medium">+5.1%</span>
+                                <span class="text-muted-foreground ml-2">vs mois dernier</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-medium text-muted-foreground">Temps Moyen de Réponse</h3>
+                                <i class="fas fa-clock text-blue-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-foreground mb-2">4.2 jours</div>
+                            <div class="flex items-center text-sm">
+                                <span class="text-green-600 font-medium">-0.8 j</span>
+                                <span class="text-muted-foreground ml-2">vs mois dernier</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-medium text-muted-foreground">Montant Moyen</h3>
+                                <i class="fas fa-euro-sign text-amber-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-foreground mb-2">€18,450</div>
+                            <div class="flex items-center text-sm">
+                                <span class="text-green-600 font-medium">+12%</span>
+                                <span class="text-muted-foreground ml-2">vs mois dernier</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-medium text-muted-foreground">Relances Efficaces</h3>
+                                <i class="fas fa-paper-plane text-purple-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-foreground mb-2">84%</div>
+                            <div class="flex items-center text-sm">
+                                <span class="text-green-600 font-medium">+2.3%</span>
+                                <span class="text-muted-foreground ml-2">vs mois dernier</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                        <!-- Status Distribution Chart -->
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-foreground">Répartition par Statut</h3>
+                                <button class="text-muted-foreground hover:text-foreground">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Revenue Trend Chart -->
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-foreground">Évolution du CA</h3>
+                                <button class="text-muted-foreground hover:text-foreground">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conversion Funnel and Follow-up Performance -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Conversion Funnel -->
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-foreground">Entonnoir de Conversion</h3>
+                                <button class="text-muted-foreground hover:text-foreground">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                                        <span class="font-medium text-foreground">Devis Envoyés</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-foreground">127</div>
+                                        <div class="text-sm text-muted-foreground">100%</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-4 bg-amber-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-4 h-4 bg-amber-500 rounded"></div>
+                                        <span class="font-medium text-foreground">En Négociation</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-foreground">89</div>
+                                        <div class="text-sm text-muted-foreground">70%</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-4 h-4 bg-green-500 rounded"></div>
+                                        <span class="font-medium text-foreground">Acceptés</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-foreground">48</div>
+                                        <div class="text-sm text-muted-foreground">38%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Follow-up Performance -->
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-foreground">Performance des Relances</h3>
+                                <button class="text-muted-foreground hover:text-foreground">
+                                    <i class="fas fa-ellipsis-h"></i>
+                                </button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="followupChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Performing Clients Table -->
+                    <div class="mt-8 bg-card rounded-lg border border-border">
+                        <div class="px-6 py-4 border-b border-border">
+                            <h3 class="text-lg font-semibold text-foreground">Top Clients (CA)</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-muted/50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Client</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Devis</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Acceptés</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Taux</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">CA Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    <!-- @MAP: topClients.map(client => ( -->
+                                    <tr data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                                    <span class="text-xs font-medium text-primary">IP</span>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <div class="text-sm font-medium text-foreground">Innovation Plus</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">8</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">6</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">75%</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">€142,300</td>
+                                    </tr>
+                                    <tr data-mock="true">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                                    <span class="text-xs font-medium text-primary">TM</span>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <div class="text-sm font-medium text-foreground">Techno Marketing</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">5</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">4</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">80%</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">€87,650</td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: StatisticsView -->
+        </div>
+    </div>
+
+    <!-- Modal for Add Client -->
+    <!-- @COMPONENT: AddClientModal [modal for adding new clients] -->
+    <div id="add-client-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-card rounded-lg border border-border w-full max-w-md">
+            <div class="p-6 border-b border-border">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-foreground">Nouveau Client</h3>
+                    <button id="close-client-modal" class="text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <form class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Nom *</label>
+                    <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Nom du contact">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Entreprise *</label>
+                    <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Nom de l'entreprise">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Email *</label>
+                    <input type="email" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="email@entreprise.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Téléphone</label>
+                    <input type="tel" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="+33 1 23 45 67 89">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Poste</label>
+                    <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Directeur, CEO, etc.">
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-client" class="px-4 py-2 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                        Créer Client
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AddClientModal -->
+
+    <!-- Modal for Add Quote -->
+    <!-- @COMPONENT: AddQuoteModal [modal for adding new quotes] -->
+    <div id="add-quote-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-card rounded-lg border border-border w-full max-w-lg">
+            <div class="p-6 border-b border-border">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-foreground">Nouveau Devis</h3>
+                    <button id="close-quote-modal" class="text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <form class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Client *</label>
+                    <select class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option>Sélectionner un client</option>
+                        <option>Techno Marketing - Jean Dupont</option>
+                        <option>Innovation Plus - Marie Leroy</option>
+                        <option>Digital Solutions - Pierre Martin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Référence *</label>
+                    <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="DEV-2024-004" value="DEV-2024-004">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Description *</label>
+                    <textarea class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" rows="3" placeholder="Description du projet"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Montant (€) *</label>
+                        <input type="number" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="15000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Date d'envoi *</label>
+                        <input type="date" class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Statut initial</label>
+                    <select class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option>Envoyé</option>
+                        <option>En attente</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Notes</label>
+                    <textarea class="w-full px-3 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" rows="2" placeholder="Notes internes..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-quote" class="px-4 py-2 border border-input rounded-md bg-background hover:bg-muted transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                        Créer Devis
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AddQuoteModal -->
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        
+        (function() {
+            // Navigation handling
+            const navItems = document.querySelectorAll('.nav-item');
+            const viewContents = document.querySelectorAll('.view-content');
+            
+            function showView(viewName) {
+                // Hide all views
+                viewContents.forEach(view => {
+                    view.classList.add('hidden');
+                });
+                
+                // Show selected view
+                const targetView = document.getElementById(viewName + '-view');
+                if (targetView) {
+                    targetView.classList.remove('hidden');
+                }
+                
+                // Update navigation active state
+                navItems.forEach(item => {
+                    item.classList.remove('text-primary', 'bg-primary/10', 'font-medium');
+                    item.classList.add('text-muted-foreground');
+                });
+                
+                const activeNav = document.querySelector(`[data-view="${viewName}"]`);
+                if (activeNav) {
+                    activeNav.classList.remove('text-muted-foreground');
+                    activeNav.classList.add('text-primary', 'bg-primary/10', 'font-medium');
+                }
+            }
+            
+            // Navigation click handlers
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const viewName = item.getAttribute('data-view');
+                    showView(viewName);
+                    
+                    // Initialize charts when switching to statistics view
+                    if (viewName === 'statistics') {
+                        setTimeout(initializeCharts, 100);
+                    }
+                });
+            });
+            
+            // Modal handling
+            const addClientBtn = document.getElementById('add-client-btn');
+            const addQuoteBtn = document.getElementById('add-quote-btn');
+            const addClientModal = document.getElementById('add-client-modal');
+            const addQuoteModal = document.getElementById('add-quote-modal');
+            const closeClientModal = document.getElementById('close-client-modal');
+            const closeQuoteModal = document.getElementById('close-quote-modal');
+            const cancelClient = document.getElementById('cancel-client');
+            const cancelQuote = document.getElementById('cancel-quote');
+            
+            function showModal(modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function hideModal(modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            }
+            
+            if (addClientBtn) {
+                addClientBtn.addEventListener('click', () => showModal(addClientModal));
+            }
+            
+            if (addQuoteBtn) {
+                addQuoteBtn.addEventListener('click', () => showModal(addQuoteModal));
+            }
+            
+            if (closeClientModal) {
+                closeClientModal.addEventListener('click', () => hideModal(addClientModal));
+            }
+            
+            if (closeQuoteModal) {
+                closeQuoteModal.addEventListener('click', () => hideModal(addQuoteModal));
+            }
+            
+            if (cancelClient) {
+                cancelClient.addEventListener('click', () => hideModal(addClientModal));
+            }
+            
+            if (cancelQuote) {
+                cancelQuote.addEventListener('click', () => hideModal(addQuoteModal));
+            }
+            
+            // Close modals on background click
+            [addClientModal, addQuoteModal].forEach(modal => {
+                if (modal) {
+                    modal.addEventListener('click', (e) => {
+                        if (e.target === modal) {
+                            hideModal(modal);
+                        }
+                    });
+                }
+            });
+            
+            // Notification system
+            function showNotification(message, type = 'success') {
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notification-text');
+                
+                if (notification && notificationText) {
+                    notificationText.textContent = message;
+                    notification.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        notification.classList.add('hidden');
+                    }, 3000);
+                }
+            }
+            
+            // Form submissions (mock)
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const formType = form.closest('#add-client-modal') ? 'client' : 'devis';
+                    showNotification(`${formType === 'client' ? 'Client' : 'Devis'} créé avec succès`);
+                    
+                    // Hide modal after submission
+                    const modal = form.closest('.fixed');
+                    if (modal) {
+                        hideModal(modal);
+                    }
+                });
+            });
+            
+            // Chart initialization function
+            function initializeCharts() {
+                // Status Distribution Chart
+                const statusCtx = document.getElementById('statusChart');
+                if (statusCtx && !statusCtx.chart) {
+                    statusCtx.chart = new Chart(statusCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Acceptés', 'En attente', 'Relancés', 'Refusés', 'Envoyés'],
+                            datasets: [{
+                                data: [48, 23, 12, 10, 34],
+                                backgroundColor: [
+                                    'rgb(34, 197, 94)',
+                                    'rgb(245, 158, 11)',
+                                    'rgb(249, 115, 22)',
+                                    'rgb(239, 68, 68)',
+                                    'rgb(59, 130, 246)'
+                                ],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20,
+                                        usePointStyle: true
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Revenue Trend Chart
+                const revenueCtx = document.getElementById('revenueChart');
+                if (revenueCtx && !revenueCtx.chart) {
+                    revenueCtx.chart = new Chart(revenueCtx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
+                            datasets: [{
+                                label: 'CA (€)',
+                                data: [45000, 52000, 48000, 61000, 55000, 67000],
+                                borderColor: 'rgb(59, 130, 246)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '€' + (value / 1000) + 'k';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Follow-up Performance Chart
+                const followupCtx = document.getElementById('followupChart');
+                if (followupCtx && !followupCtx.chart) {
+                    followupCtx.chart = new Chart(followupCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['1ère relance', '2ème relance', '3ème relance', '4ème relance+'],
+                            datasets: [{
+                                label: 'Taux de conversion (%)',
+                                data: [45, 28, 15, 8],
+                                backgroundColor: [
+                                    'rgba(34, 197, 94, 0.8)',
+                                    'rgba(245, 158, 11, 0.8)',
+                                    'rgba(249, 115, 22, 0.8)',
+                                    'rgba(239, 68, 68, 0.8)'
+                                ],
+                                borderColor: [
+                                    'rgb(34, 197, 94)',
+                                    'rgb(245, 158, 11)',
+                                    'rgb(249, 115, 22)',
+                                    'rgb(239, 68, 68)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 50,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return value + '%';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Initialize default view
+            showView('dashboard');
+        })();
+    </script>
+</body>
+</html>

@@ -93,8 +93,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4 flex items-center text-sm">
-                <span className="text-green-600 font-medium">+12%</span>
-                <span className="text-slate-500 ml-2">par rapport au mois dernier</span>
+                <span className="text-slate-500">Données en temps réel</span>
               </div>
             </CardContent>
           </Card>
@@ -116,7 +115,7 @@ export default function Dashboard() {
                 <span className="text-amber-600 font-medium" data-testid="pending-followups-count">
                   {pendingFollowUps.length} à relancer
                 </span>
-                <span className="text-slate-500 ml-2">cette semaine</span>
+                <span className="text-slate-500 ml-2">en attente</span>
               </div>
             </CardContent>
           </Card>
@@ -135,8 +134,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4 flex items-center text-sm">
-                <span className="text-green-600 font-medium">+5%</span>
-                <span className="text-slate-500 ml-2">ce mois-ci</span>
+                <span className="text-slate-500">Calculé automatiquement</span>
               </div>
             </CardContent>
           </Card>
@@ -155,8 +153,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4 flex items-center text-sm">
-                <span className="text-blue-600 font-medium">€156K</span>
-                <span className="text-slate-500 ml-2">acceptés ce mois</span>
+                <span className="text-slate-500">Basé sur vos devis</span>
               </div>
             </CardContent>
           </Card>
@@ -172,7 +169,13 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="space-y-4" data-testid="recent-quotes">
                 {recentQuotes.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Aucun devis trouvé</p>
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                      <FileText className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <p className="text-slate-500 mb-2">Aucun devis pour le moment</p>
+                    <p className="text-sm text-slate-400">Commencez par ajouter votre premier client et devis</p>
+                  </div>
                 ) : (
                   recentQuotes.map((quote) => (
                     <div key={quote.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-b-0">
@@ -215,12 +218,32 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="space-y-4" data-testid="pending-followups">
                 {urgentFollowUps.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Aucune relance en attente</p>
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <Clock className="w-8 h-8 text-green-400" />
+                    </div>
+                    <p className="text-slate-500 mb-2">Aucune relance en attente</p>
+                    <p className="text-sm text-slate-400">Tous vos devis sont à jour</p>
+                  </div>
                 ) : (
                   urgentFollowUps.map((quote) => {
-                    const lastDate = quote.lastFollowUpDate ? new Date(quote.lastFollowUpDate) : new Date(quote.sentDate);
-                    const daysPassed = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-                    const isUrgent = daysPassed > 10;
+                    // Use planned follow-up date if available, otherwise calculate from last follow-up
+                    let followUpDate: Date;
+                    let isPlanned = false;
+                    
+                    if (quote.plannedFollowUpDate) {
+                      followUpDate = new Date(quote.plannedFollowUpDate);
+                      isPlanned = true;
+                    } else {
+                      followUpDate = quote.lastFollowUpDate ? new Date(quote.lastFollowUpDate) : new Date(quote.sentDate);
+                    }
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    followUpDate.setHours(0, 0, 0, 0);
+                    
+                    const daysDiff = Math.floor((today.getTime() - followUpDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const isUrgent = daysDiff > 0;
                     
                     return (
                       <div 
@@ -234,8 +257,17 @@ export default function Dashboard() {
                           <div>
                             <p className="font-medium text-slate-900">{quote.client.company}</p>
                             <p className="text-sm text-slate-500">
-                              {isUrgent ? `En retard de ${daysPassed - 7} jours` : "À relancer aujourd'hui"}
+                              {isPlanned ? (
+                                isUrgent ? `En retard de ${daysDiff} jour${daysDiff > 1 ? 's' : ''}` : "À relancer aujourd'hui"
+                              ) : (
+                                isUrgent ? `En retard de ${daysDiff} jour${daysDiff > 1 ? 's' : ''}` : "À relancer aujourd'hui"
+                              )}
                             </p>
+                            {isPlanned && (
+                              <p className="text-xs text-slate-400">
+                                Planifiée pour le {new Date(quote.plannedFollowUpDate!).toLocaleDateString('fr-FR')}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <Button 

@@ -50,7 +50,9 @@ export default function RevenueChart({ data }: RevenueChartProps) {
             beginAtZero: true,
             ticks: {
               callback: function (value) {
-                return "€" + (Number(value) / 1000) + "k";
+                const n = Number(value);
+                if (n >= 1000) return "€" + (n / 1000).toFixed(0) + "k";
+                return "€" + n.toFixed(0);
               },
             },
           },

@@ -3,7 +3,11 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, BarController);
 
-export default function FollowupChart() {
+interface FollowupChartProps {
+  data?: { [key: string]: number };
+}
+
+export default function FollowupChart({ data = {} }: FollowupChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
 
@@ -25,7 +29,12 @@ export default function FollowupChart() {
         datasets: [
           {
             label: "Taux de conversion (%)",
-            data: [45, 28, 15, 8],
+            data: [
+              data["1ère relance"] || 0,
+              data["2ème relance"] || 0,
+              data["3ème relance"] || 0,
+              data["4ème relance+"] || 0,
+            ],
             backgroundColor: [
               "rgba(34, 197, 94, 0.8)",
               "rgba(245, 158, 11, 0.8)",
@@ -69,7 +78,7 @@ export default function FollowupChart() {
         chartRef.current.destroy();
       }
     };
-  }, []);
+  }, [data]);
 
   return <canvas ref={canvasRef} data-testid="followup-chart-canvas" />;
 }

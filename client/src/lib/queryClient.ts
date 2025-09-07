@@ -12,9 +12,14 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  try {
+    const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrf_token='))?.split('=')[1];
+    if (csrf) headers['X-CSRF-Token'] = decodeURIComponent(csrf);
+  } catch {}
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -48,12 +53,26 @@ export const getQueryFn: <T>(options: {
       }
     }
     
+    const headers: Record<string, string> = {};
+    try {
+      const csrf = document.cookie.split('; ').find((c) => c.startsWith('csrf_token='))?.split('=')[1];
+      if (csrf) headers['X-CSRF-Token'] = decodeURIComponent(csrf);
+    } catch {}
     const res = await fetch(url, {
       credentials: "include",
+      headers,
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      if (unauthorizedBehavior === "returnNull") {
+        return null as unknown as T;
+      }
+      // Redirect to login on unauthorized
+      try {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      } catch {}
     }
 
     await throwIfResNotOk(res);

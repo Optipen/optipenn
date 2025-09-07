@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, Plus, Edit, Eye, Trash2, Send, AlertTriangle } from "lucide-react";
+import { Search, Download, Plus, Edit, Eye, Trash2, Send, AlertTriangle, Calendar } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddQuoteModal from "@/components/modals/add-quote-modal";
@@ -13,12 +13,14 @@ import type { QuoteWithClient } from "@shared/schema";
 
 export default function Quotes() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [statusFilter, setStatusFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const { toast } = useToast();
 
   const { data: quotes = [], isLoading } = useQuery<QuoteWithClient[]>({
-    queryKey: ["/api/quotes", { status: statusFilter === "all" ? "" : statusFilter }],
+    queryKey: ["/api/quotes", { status: statusFilter === "all" ? "" : statusFilter, page, pageSize }],
   });
 
   const { data: stats } = useQuery<any>({
@@ -39,6 +41,26 @@ export default function Quotes() {
       toast({
         title: "Erreur",
         description: "Erreur lors de la suppression du devis",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateQuoteMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Pick<QuoteWithClient, "plannedFollowUpDate">> }) =>
+      apiRequest("PUT", `/api/quotes/${id}`, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pending-follow-ups"] });
+      toast({
+        title: "Succès",
+        description: "Relance planifiée mise à jour",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de planifier la relance",
         variant: "destructive",
       });
     },
@@ -80,6 +102,17 @@ export default function Quotes() {
     }
   };
 
+  const handlePlanFollowUp = (quoteId: string, current?: string | null) => {
+    const input = prompt("Date de relance planifiée (YYYY-MM-DD)", current || "");
+    if (input === null) return;
+    const trimmed = input.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      toast({ title: "Format invalide", description: "Utilisez YYYY-MM-DD", variant: "destructive" });
+      return;
+    }
+    updateQuoteMutation.mutate({ id: quoteId, updates: { plannedFollowUpDate: trimmed } as any });
+  };
+
   const handleExportCSV = () => {
     window.open("/api/export/quotes", "_blank");
   };
@@ -100,9 +133,39 @@ export default function Quotes() {
   };
 
   const isOverdue = (quote: QuoteWithClient) => {
+    if (quote.status === "Accepté" || quote.status === "Refusé") return false;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // If planned date exists, overdue = today > planned
+    if (quote.plannedFollowUpDate) {
+      const planned = new Date(quote.plannedFollowUpDate);
+      planned.setHours(0, 0, 0, 0);
+      return todayStart.getTime() > planned.getTime();
+    }
+
+    // Else fallback: >7 jours depuis dernière relance ou date d'envoi
     const lastDate = quote.lastFollowUpDate ? new Date(quote.lastFollowUpDate) : new Date(quote.sentDate);
-    const daysPassed = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysPassed > 7 && quote.status !== "Accepté" && quote.status !== "Refusé";
+    const daysPassed = Math.floor((todayStart.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysPassed > 7;
+  };
+
+  const getPlannedFollowUpBadge = (quote: QuoteWithClient) => {
+    if (!quote.plannedFollowUpDate) return <span className="text-slate-400">—</span>;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const planned = new Date(quote.plannedFollowUpDate);
+    planned.setHours(0, 0, 0, 0);
+
+    let className = "bg-green-100 text-green-800";
+    if (planned.getTime() < today.getTime()) className = "bg-red-100 text-red-800";
+    else if (planned.getTime() === today.getTime()) className = "bg-amber-100 text-amber-800";
+
+    return (
+      <Badge className={className} data-testid={`quote-planned-followup-${quote.id}`}>
+        {planned.toLocaleDateString('fr-FR')}
+      </Badge>
+    );
   };
 
   // Filter quotes based on search
@@ -193,6 +256,11 @@ export default function Quotes() {
             </div>
           </CardContent>
         </Card>
+        <div className="flex justify-center mt-4">
+          <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Précédent</Button>
+          <span className="mx-3 text-sm text-slate-600">Page {page}</span>
+          <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={quotes.length < pageSize}>Suivant</Button>
+        </div>
 
         {/* Status Overview Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6" data-testid="status-overview">
@@ -263,6 +331,9 @@ export default function Quotes() {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Relance prévue
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Statut
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -273,7 +344,7 @@ export default function Quotes() {
               <tbody className="divide-y divide-slate-200" data-testid="quotes-table">
                 {filteredQuotes.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
                       {search ? "Aucun devis trouvé pour cette recherche" : "Aucun devis ajouté"}
                     </td>
                   </tr>
@@ -308,12 +379,27 @@ export default function Quotes() {
                           {new Date(quote.sentDate).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          {getPlannedFollowUpBadge(quote)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <Badge className={getStatusVariant(quote.status)} data-testid={`quote-status-${quote.id}`}>
                             {quote.status}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex items-center space-x-2">
+                            {quote.status !== "Accepté" && quote.status !== "Refusé" && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-amber-600 hover:text-amber-700"
+                                onClick={() => handlePlanFollowUp(quote.id, quote.plannedFollowUpDate as any)}
+                                disabled={updateQuoteMutation.isPending}
+                                data-testid={`button-planfollowup-${quote.id}`}
+                              >
+                                <Calendar className="w-4 h-4" />
+                              </Button>
+                            )}
                             {quote.status !== "Accepté" && quote.status !== "Refusé" && (
                               <Button 
                                 variant="ghost" 

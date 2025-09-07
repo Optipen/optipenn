@@ -33,6 +33,7 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
       sentDate: new Date().toISOString().split('T')[0],
       status: "Envoyé",
       notes: "",
+      plannedFollowUpDate: "",
     },
   });
 
@@ -68,14 +69,20 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
     return `DEV-${year}-${random}`;
   };
 
-  // Auto-generate reference when modal opens
+  // Auto-generate reference and suggest follow-up date when modal opens
   if (open && !form.getValues('reference')) {
     form.setValue('reference', generateReference());
+    
+    // Suggest follow-up date (7 days from sent date)
+    const sentDate = new Date(form.getValues('sentDate'));
+    const suggestedFollowUpDate = new Date(sentDate);
+    suggestedFollowUpDate.setDate(sentDate.getDate() + 7);
+    form.setValue('plannedFollowUpDate', suggestedFollowUpDate.toISOString().split('T')[0]);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg" data-testid="add-quote-modal">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="add-quote-modal">
         <DialogHeader>
           <DialogTitle>Nouveau Devis</DialogTitle>
           <DialogDescription>
@@ -168,23 +175,33 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="sentDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date d'envoi *</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="date"
-                        {...field}
-                        data-testid="input-quote-date"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                          <FormField
+              control={form.control}
+              name="sentDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date d'envoi *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="date"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        // Auto-update follow-up date when sent date changes
+                        if (e.target.value) {
+                          const sentDate = new Date(e.target.value);
+                          const followUpDate = new Date(sentDate);
+                          followUpDate.setDate(sentDate.getDate() + 7);
+                          form.setValue('plannedFollowUpDate', followUpDate.toISOString().split('T')[0]);
+                        }
+                      }}
+                      data-testid="input-quote-date"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             </div>
 
             <FormField
@@ -211,6 +228,25 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
 
             <FormField
               control={form.control}
+              name="plannedFollowUpDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date de relance planifiée</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="date"
+                      {...field}
+                      value={field.value || ""}
+                      data-testid="input-planned-followup-date"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="notes"
               render={({ field }) => (
                 <FormItem>
@@ -229,7 +265,7 @@ export default function AddQuoteModal({ open, onOpenChange }: AddQuoteModalProps
               )}
             />
 
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex justify-end space-x-3 pt-4 pb-4">
               <Button 
                 type="button" 
                 variant="outline" 
