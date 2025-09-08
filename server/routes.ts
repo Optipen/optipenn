@@ -11,8 +11,10 @@ import type { Request, Response, NextFunction } from "express";
 
 function escapeCsvField(value: unknown): string {
   const raw = value == null ? "" : String(value);
+  // RFC 4180: Fields containing line breaks (CRLF), double quotes, or commas should be enclosed in double quotes
   const needsQuoting = /[",\n\r]/.test(raw);
-  let escaped = raw.replace(/"/g, '""');
+  // RFC 4180: If double quotes are used to enclose fields, then a double quote appearing inside a field must be escaped by preceding it with another double quote
+  const escaped = raw.replace(/"/g, '""');
   return needsQuoting ? `"${escaped}"` : escaped;
 }
 
@@ -301,8 +303,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         q.amount,
         q.sentDate,
         q.status,
-      ].map(escapeCsvField).join(",")).join("\n");
-      const csv = `\uFEFF${headerLine}\n${rows}`;
+      ].map(escapeCsvField).join(",")).join("\r\n"); // RFC 4180: Use CRLF line endings
+      const csv = `\uFEFF${headerLine}\r\n${rows}`;
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="devis.csv"');
@@ -318,39 +320,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotes = await storage.getQuotes();
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", 'attachment; filename="devis.pdf"');
-      const doc = new PDFDocument({ size: "A4", margin: 40 });
+      
+      const doc = new PDFDocument({ 
+        size: "A4", 
+        margin: 50,
+        info: {
+          Title: "Liste des Devis",
+          Author: "OptiPen CRM",
+          Subject: "Export des devis",
+          Creator: "OptiPen CRM System"
+        }
+      });
       doc.pipe(res);
 
-      doc.fontSize(18).text("Liste des devis", { align: "center" });
-      doc.moveDown();
+      // Document header with company branding
+      doc.fontSize(24).fillColor("#2563eb").text("OptiPen CRM", { align: "left" });
+      doc.fontSize(18).fillColor("#1f2937").text("Liste des Devis", { align: "left" });
+      doc.fontSize(10).fillColor("#6b7280").text(`Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`, { align: "left" });
+      
+      // Add separator line
+      doc.moveTo(50, doc.y + 10).lineTo(545, doc.y + 10).strokeColor("#e5e7eb").stroke();
+      doc.moveDown(1.5);
 
-      const headers = ["Référence", "Client", "Description", "Montant", "Date", "Statut"]; 
-      const colWidths = [100, 130, 150, 70, 70, 70];
-      const startX = doc.x;
-      let y = doc.y;
+      // Summary statistics
+      const totalAmount = quotes.reduce((sum, q) => sum + parseFloat(q.amount as any), 0);
+      const pendingCount = quotes.filter(q => q.status === "En attente").length;
+      const acceptedCount = quotes.filter(q => q.status === "Accepté").length;
+      const rejectedCount = quotes.filter(q => q.status === "Refusé").length;
 
-      doc.fontSize(10).fillColor("#111827");
-      headers.forEach((h, i) => {
-        doc.text(h, startX + colWidths.slice(0, i).reduce((a, b) => a + b, 0), y, { width: colWidths[i], continued: i !== headers.length - 1 });
-      });
-      doc.moveDown(0.5);
-      y = doc.y;
-      doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y).stroke("#E5E7EB");
+      doc.fontSize(12).fillColor("#374151");
+      doc.text(`Nombre total de devis: ${quotes.length}`, { continued: true });
+      doc.text(`  •  Montant total: ${totalAmount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}`, { align: "left" });
+      doc.text(`En attente: ${pendingCount}  •  Acceptés: ${acceptedCount}  •  Refusés: ${rejectedCount}`);
+      doc.moveDown(1);
 
-      for (const q of quotes) {
-        if (doc.y > doc.page.height - 80) {
-          doc.addPage();
-          y = doc.y;
-        }
-        const row = [q.reference, q.client.company, q.description, `€${parseFloat(q.amount as any).toLocaleString()}`, new Date(q.sentDate).toLocaleDateString("fr-FR"), q.status];
-        row.forEach((cell, i) => {
-          doc.text(String(cell), startX + colWidths.slice(0, i).reduce((a, b) => a + b, 0), doc.y, { width: colWidths[i], continued: i !== row.length - 1 });
+      if (quotes.length === 0) {
+        doc.fontSize(14).fillColor("#6b7280").text("Aucun devis à afficher", { align: "center" });
+        doc.end();
+        return;
+      }
+
+      // Table setup
+      const headers = ["Référence", "Client", "Entreprise", "Description", "Montant", "Date", "Statut"];
+      const colWidths = [80, 100, 110, 140, 70, 60, 60];
+      const startX = 50;
+      const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+      let currentY = doc.y;
+
+      // Function to draw table header
+      const drawHeader = () => {
+        currentY = doc.y;
+        
+        // Header background
+        doc.rect(startX, currentY - 5, tableWidth, 25).fillColor("#f3f4f6").fill();
+        
+        // Header text
+        doc.fontSize(10).fillColor("#374151");
+        let currentX = startX;
+        headers.forEach((header, i) => {
+          doc.text(header, currentX + 5, currentY + 5, { 
+            width: colWidths[i] - 10, 
+            align: "left",
+            continued: i !== headers.length - 1 
+          });
+          currentX += colWidths[i];
         });
-        doc.moveDown(0.5);
+        
+        doc.moveDown(0.3);
+        currentY = doc.y;
+        
+        // Header border
+        doc.rect(startX, currentY - 25, tableWidth, 25).strokeColor("#d1d5db").stroke();
+        
+        // Vertical lines for header
+        let x = startX;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.moveTo(x, currentY - 25).lineTo(x, currentY).stroke();
+        }
+      };
+
+      // Function to check if we need a new page
+      const checkNewPage = (rowHeight = 20) => {
+        if (currentY + rowHeight > doc.page.height - 80) {
+          doc.addPage();
+          currentY = 80;
+          drawHeader();
+        }
+      };
+
+      // Draw initial header
+      drawHeader();
+
+      // Table rows
+      quotes.forEach((quote, index) => {
+        checkNewPage(25);
+        
+        const rowY = currentY;
+        
+        // Alternate row background
+        if (index % 2 === 1) {
+          doc.rect(startX, rowY, tableWidth, 20).fillColor("#f9fafb").fill();
+        }
+        
+        // Status color coding
+        let statusColor = "#6b7280";
+        if (quote.status === "Accepté") statusColor = "#059669";
+        else if (quote.status === "Refusé") statusColor = "#dc2626";
+        else if (quote.status === "En attente") statusColor = "#d97706";
+        
+        // Row data
+        const rowData = [
+          quote.reference,
+          quote.client.name.length > 15 ? quote.client.name.substring(0, 12) + "..." : quote.client.name,
+          quote.client.company.length > 18 ? quote.client.company.substring(0, 15) + "..." : quote.client.company,
+          quote.description.length > 25 ? quote.description.substring(0, 22) + "..." : quote.description,
+          parseFloat(quote.amount as any).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }),
+          new Date(quote.sentDate).toLocaleDateString("fr-FR"),
+          quote.status
+        ];
+        
+        doc.fontSize(9).fillColor("#374151");
+        let currentX = startX;
+        rowData.forEach((data, i) => {
+          const color = i === 6 ? statusColor : "#374151"; // Status column uses status color
+          doc.fillColor(color).text(String(data), currentX + 3, rowY + 5, { 
+            width: colWidths[i] - 6, 
+            align: i === 4 ? "right" : "left", // Amount column right-aligned
+            continued: i !== rowData.length - 1 
+          });
+          currentX += colWidths[i];
+        });
+        
+        doc.moveDown(0.3);
+        currentY = doc.y;
+        
+        // Row border
+        doc.rect(startX, rowY, tableWidth, 20).strokeColor("#e5e7eb").stroke();
+        
+        // Vertical lines
+        let x = startX;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.moveTo(x, rowY).lineTo(x, rowY + 20).strokeColor("#e5e7eb").stroke();
+        }
+      });
+
+      // Footer
+      const pageCount = doc.bufferedPageRange().count;
+      for (let i = 0; i < pageCount; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(8).fillColor("#6b7280");
+        doc.text(
+          `Page ${i + 1} sur ${pageCount} - OptiPen CRM - ${new Date().toLocaleDateString("fr-FR")}`,
+          50,
+          doc.page.height - 50,
+          { align: "center", width: doc.page.width - 100 }
+        );
       }
 
       doc.end();
     } catch (error) {
+      console.error("PDF generation error:", error);
       res.status(500).json({ message: "Erreur lors de l'export PDF" });
     }
   });
