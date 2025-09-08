@@ -62,9 +62,10 @@ export default function GlobalSearch({ onResultSelect, placeholder = "Rechercher
   // Recherche avec debounce
   const { data: results = [], isLoading } = useQuery<SearchResult[]>({
     queryKey: ["/api/search/global", query],
-    queryFn: async () => {
+    queryFn: async (): Promise<SearchResult[]> => {
       if (query.length < 2) return [];
-      return apiRequest("GET", `/api/search/global?q=${encodeURIComponent(query)}`);
+      const response = await apiRequest("GET", `/api/search/global?q=${encodeURIComponent(query)}`);
+      return await response.json();
     },
     enabled: query.length >= 2,
   });
