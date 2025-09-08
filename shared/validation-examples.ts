@@ -9,7 +9,7 @@ import {
   strictDateValidation,
   TimezoneUtils,
   formatUtils 
-} from '../validation-utils';
+} from './validation-utils';
 
 // Example 1: Email validation with domain checking
 console.log('=== Example 1: Email Validation ===');
@@ -24,7 +24,7 @@ try {
   const invalidEmail = strictEmailValidation.parse('test@example.com'); // Blocked domain
   console.log('✓ Email accepted:', invalidEmail);
 } catch (error) {
-  console.log('✗ Email rejected (suspicious domain):', error.message);
+  console.log('✗ Email rejected (suspicious domain):', (error as Error).message);
 }
 
 // Example 2: Amount validation and normalization
@@ -67,7 +67,7 @@ try {
   console.log('Parsed French date (UTC):', frenchDate.toISOString());
   console.log('Formatted for display:', TimezoneUtils.formatFrench(frenchDate));
 } catch (error) {
-  console.log('✗ Error parsing French date:', error.message);
+  console.log('✗ Error parsing French date:', (error as Error).message);
 }
 
 // Example 6: Currency formatting
