@@ -29,10 +29,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   };
-  // Auth routes
-  app.post("/api/auth/register", register);
-  const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
-  app.post("/api/auth/login", loginLimiter, login);
+  // Auth routes with brute-force protection
+  
+  // Rate limiter for registration - prevent account creation spam
+  const registerLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Increased to 10 registration attempts per 15 minutes per IP
+    message: { message: "Trop de tentatives d'inscription. Réessayez dans 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Count all requests, not just failed ones for registration to prevent spam
+    skipSuccessfulRequests: false
+  });
+  
+  // Enhanced rate limiter for login - more restrictive against brute-force
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Increased to 10 attempts per window to allow for legitimate failed attempts
+    message: { message: "Trop de tentatives de connexion. Réessayez dans 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip successful requests to only count failed ones
+    skipSuccessfulRequests: true
+  });
+  
+  // Progressive delay limiter for severe brute-force attempts
+  const strictLoginLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 20, // Maximum 20 attempts per hour (increased from 10)
+    message: { message: "Compte temporairement verrouillé. Réessayez dans 1 heure." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true
+  });
+  
+  app.post("/api/auth/register", registerLimiter, register);
+  app.post("/api/auth/login", strictLoginLimiter, loginLimiter, login);
   app.post("/api/auth/logout", csrfProtect, logout);
 
   // Client routes
