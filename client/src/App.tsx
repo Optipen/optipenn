@@ -10,6 +10,7 @@ import Quotes from "@/pages/quotes";
 import Statistics from "@/pages/statistics";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import CsrfDemo from "@/pages/csrf-demo";
 import GlobalSearch from "@/components/ui/global-search";
 import NotificationCenter from "@/components/ui/notification-center";
 import OnboardingTour, { useOnboardingTour } from "@/components/ui/onboarding-tour";
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/clients" component={() => <ProtectedRoute component={Clients} />} />
       <Route path="/quotes" component={() => <ProtectedRoute component={Quotes} />} />
       <Route path="/statistics" component={() => <ProtectedRoute component={Statistics} />} />
+      <Route path="/csrf-demo" component={() => <ProtectedRoute component={CsrfDemo} />} />
       <Route component={NotFound} />
     </Switch>
   );
