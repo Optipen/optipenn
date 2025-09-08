@@ -27,3 +27,5 @@ temp/
 # Log files
 *.log
 logs/
+test_reports/
+test_screenshots/
