@@ -26,7 +26,8 @@ export function startSchedulers() {
   // Every day at 08:00
   cron.schedule("0 8 * * *", async () => {
     try {
-      const pending = await storage.getPendingFollowUps();
+      const result = await storage.getPendingFollowUps(1, 100); // Get first 100 pending
+      const pending = result.followUps;
       const mail = getTransport();
       if (!mail) return; // skip if mail not configured
       for (const q of pending) {

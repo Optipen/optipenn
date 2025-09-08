@@ -1,11 +1,13 @@
 import { type Client, type Quote, type FollowUp, type InsertClient, type InsertQuote, type InsertFollowUp, type QuoteWithClient, type InsertUser, type User, clients, quotes, followUps, users } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { getDb, withSafeDelete } from "./db";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql, and, like, or, ilike, count, avg, sum } from "drizzle-orm";
+import { logger } from "./logger";
+import { metrics } from "./metrics";
 
 export interface IStorage {
   // Clients
-  getClients(search?: string): Promise<Client[]>;
+  getClients(search?: string, page?: number, pageSize?: number): Promise<{ clients: Client[]; total: number }>;
   getClient(id: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
@@ -13,7 +15,7 @@ export interface IStorage {
   deleteClientWithData(id: string): Promise<boolean>; // Transactional cascade deletion with verification
 
   // Quotes
-  getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]>;
+  getQuotes(filters?: { status?: string; clientId?: string }, page?: number, pageSize?: number): Promise<{ quotes: QuoteWithClient[]; total: number }>;
   getQuote(id: string): Promise<Quote | undefined>;
   createQuote(quote: InsertQuote): Promise<Quote>;
   updateQuote(id: string, quote: Partial<InsertQuote>): Promise<Quote | undefined>;
@@ -23,7 +25,7 @@ export interface IStorage {
   // Follow-ups
   getFollowUps(quoteId: string): Promise<FollowUp[]>;
   createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
-  getPendingFollowUps(): Promise<QuoteWithClient[]>;
+  getPendingFollowUps(page?: number, pageSize?: number): Promise<{ followUps: QuoteWithClient[]; total: number }>;
 
   // Statistics
   getQuoteStats(): Promise<{
@@ -52,19 +54,26 @@ export class MemStorage implements IStorage {
     this.users = new Map();
   }
 
-  async getClients(search?: string): Promise<Client[]> {
+  async getClients(search?: string, page: number = 1, pageSize: number = 10): Promise<{ clients: Client[]; total: number }> {
     const allClients = Array.from(this.clients.values());
     
-    if (!search) {
-      return allClients.sort((a, b) => a.name.localeCompare(b.name));
+    let filteredClients = allClients;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredClients = allClients.filter(client => 
+        client.name.toLowerCase().includes(searchLower) ||
+        client.company.toLowerCase().includes(searchLower) ||
+        client.email.toLowerCase().includes(searchLower)
+      );
     }
     
-    const searchLower = search.toLowerCase();
-    return allClients.filter(client => 
-      client.name.toLowerCase().includes(searchLower) ||
-      client.company.toLowerCase().includes(searchLower) ||
-      client.email.toLowerCase().includes(searchLower)
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    filteredClients.sort((a, b) => a.name.localeCompare(b.name));
+    
+    const total = filteredClients.length;
+    const start = (page - 1) * pageSize;
+    const clients = filteredClients.slice(start, start + pageSize);
+    
+    return { clients, total };
   }
 
   async getClient(id: string): Promise<Client | undefined> {
@@ -112,7 +121,7 @@ export class MemStorage implements IStorage {
     return this.deleteClient(id);
   }
 
-  async getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]> {
+  async getQuotes(filters?: { status?: string; clientId?: string }, page: number = 1, pageSize: number = 10): Promise<{ quotes: QuoteWithClient[]; total: number }> {
     const allQuotes = Array.from(this.quotes.values());
     
     let filteredQuotes = allQuotes;
@@ -134,7 +143,13 @@ export class MemStorage implements IStorage {
       }
     }
 
-    return quotesWithClients.sort((a, b) => new Date(b.sentDate).getTime() - new Date(a.sentDate).getTime());
+    const sortedQuotes = quotesWithClients.sort((a, b) => new Date(b.sentDate).getTime() - new Date(a.sentDate).getTime());
+    
+    const total = sortedQuotes.length;
+    const start = (page - 1) * pageSize;
+    const quotes = sortedQuotes.slice(start, start + pageSize);
+
+    return { quotes, total };
   }
 
   async getQuote(id: string): Promise<Quote | undefined> {
@@ -213,7 +228,7 @@ export class MemStorage implements IStorage {
     return followUp;
   }
 
-  async getPendingFollowUps(): Promise<QuoteWithClient[]> {
+  async getPendingFollowUps(page: number = 1, pageSize: number = 10): Promise<{ followUps: QuoteWithClient[]; total: number }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset to start of day
 
@@ -245,7 +260,11 @@ export class MemStorage implements IStorage {
       }
     }
 
-    return pendingWithClients;
+    const total = pendingWithClients.length;
+    const start = (page - 1) * pageSize;
+    const followUps = pendingWithClients.slice(start, start + pageSize);
+
+    return { followUps, total };
   }
 
   async getQuoteStats(): Promise<{
@@ -347,20 +366,48 @@ export class MemStorage implements IStorage {
 const memFallback = new MemStorage();
 
 class SqlStorage implements IStorage {
-  async getClients(search?: string): Promise<Client[]> {
+  async getClients(search?: string, page: number = 1, pageSize: number = 10): Promise<{ clients: Client[]; total: number }> {
+    const startTime = Date.now();
     const db = getDb();
-    if (!db) return memFallback.getClients(search);
-    if (search && search.trim()) {
-      const term = `%${search.toLowerCase()}%`;
+    if (!db) return memFallback.getClients(search, page, pageSize);
+    
+    try {
+      let whereCondition;
+      if (search && search.trim()) {
+        const term = `%${search.toLowerCase()}%`;
+        whereCondition = or(
+          ilike(clients.name, term),
+          ilike(clients.company, term), 
+          ilike(clients.email, term)
+        );
+      }
+
+      // Get total count
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(clients)
+        .where(whereCondition);
+      const total = totalResult.count as number;
+
+      // Get paginated results
+      const offset = (page - 1) * pageSize;
       const rows = await db
         .select()
         .from(clients)
-        .where(sql`lower(${clients.name}) like ${term} or lower(${clients.company}) like ${term} or lower(${clients.email}) like ${term}`)
-        .orderBy(clients.name);
-      return rows as Client[];
+        .where(whereCondition)
+        .orderBy(clients.name)
+        .limit(pageSize)
+        .offset(offset);
+
+      const duration = Date.now() - startTime;
+      logger.logPerformance("getClients", duration, { search, page, pageSize, total });
+      metrics.recordSlowQuery("getClients", duration);
+
+      return { clients: rows as Client[], total };
+    } catch (error) {
+      logger.error("Error fetching clients", { search, page, pageSize }, error as Error);
+      return memFallback.getClients(search, page, pageSize);
     }
-    const rows = await db.select().from(clients).orderBy(clients.name);
-    return rows as Client[];
   }
 
   async getClient(id: string): Promise<Client | undefined> {
@@ -445,25 +492,96 @@ class SqlStorage implements IStorage {
     }
   }
 
-  async getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]> {
+  async getQuotes(filters?: { status?: string; clientId?: string }, page: number = 1, pageSize: number = 10): Promise<{ quotes: QuoteWithClient[]; total: number }> {
+    const startTime = Date.now();
     const db = getDb();
-    if (!db) return memFallback.getQuotes(filters);
-    let rows = (await db.select().from(quotes).orderBy(desc(quotes.sentDate))) as Quote[];
-    if (filters?.status && filters.status !== "Tous les statuts") {
-      rows = rows.filter((q) => q.status === filters.status);
+    if (!db) return memFallback.getQuotes(filters, page, pageSize);
+    
+    try {
+      // Build where conditions
+      const conditions = [];
+      if (filters?.status && filters.status !== "Tous les statuts") {
+        conditions.push(eq(quotes.status, filters.status as any));
+      }
+      if (filters?.clientId) {
+        conditions.push(eq(quotes.clientId, filters.clientId));
+      }
+      
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count with filter
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(quotes)
+        .where(whereClause);
+      const total = totalResult.count as number;
+
+      // Get paginated results with JOIN to prevent N+1 queries
+      const offset = (page - 1) * pageSize;
+      const rows = await db
+        .select({
+          // Quote fields
+          id: quotes.id,
+          reference: quotes.reference,
+          clientId: quotes.clientId,
+          description: quotes.description,
+          amount: quotes.amount,
+          sentDate: quotes.sentDate,
+          status: quotes.status,
+          notes: quotes.notes,
+          lastFollowUpDate: quotes.lastFollowUpDate,
+          plannedFollowUpDate: quotes.plannedFollowUpDate,
+          acceptedAt: quotes.acceptedAt,
+          createdAt: quotes.createdAt,
+          // Client fields
+          clientName: clients.name,
+          clientCompany: clients.company,
+          clientEmail: clients.email,
+          clientPhone: clients.phone,
+          clientPosition: clients.position,
+          clientCreatedAt: clients.createdAt,
+        })
+        .from(quotes)
+        .innerJoin(clients, eq(quotes.clientId, clients.id))
+        .where(whereClause)
+        .orderBy(desc(quotes.sentDate))
+        .limit(pageSize)
+        .offset(offset);
+
+      // Transform to QuoteWithClient format
+      const quotesWithClients: QuoteWithClient[] = rows.map(row => ({
+        id: row.id,
+        reference: row.reference,
+        clientId: row.clientId,
+        description: row.description,
+        amount: row.amount,
+        sentDate: row.sentDate,
+        status: row.status,
+        notes: row.notes,
+        lastFollowUpDate: row.lastFollowUpDate,
+        plannedFollowUpDate: row.plannedFollowUpDate,
+        acceptedAt: row.acceptedAt,
+        createdAt: row.createdAt,
+        client: {
+          id: row.clientId,
+          name: row.clientName,
+          company: row.clientCompany,
+          email: row.clientEmail,
+          phone: row.clientPhone,
+          position: row.clientPosition,
+          createdAt: row.clientCreatedAt,
+        }
+      }));
+
+      const duration = Date.now() - startTime;
+      logger.logPerformance("getQuotes", duration, { filters, page, pageSize, total });
+      metrics.recordSlowQuery("getQuotes", duration);
+
+      return { quotes: quotesWithClients, total };
+    } catch (error) {
+      logger.error("Error fetching quotes", { filters, page, pageSize }, error as Error);
+      return memFallback.getQuotes(filters, page, pageSize);
     }
-    if (filters?.clientId) {
-      rows = rows.filter((q) => q.clientId === filters.clientId);
-    }
-    const clientIds = Array.from(new Set(rows.map((r) => r.clientId)));
-    const clientsRows = clientIds.length
-      ? ((await db.select().from(clients).where(sql`${clients.id} in (${sql.join(clientIds, sql`,`)})`)) as Client[])
-      : [];
-    const map = new Map<string, Client>();
-    clientsRows.forEach((c) => map.set((c as any).id, c));
-    return rows
-      .map((q) => ({ ...(q as any), client: map.get(q.clientId)! }))
-      .filter((q) => q.client);
   }
 
   async getQuote(id: string): Promise<Quote | undefined> {
@@ -538,32 +656,95 @@ class SqlStorage implements IStorage {
     return row as FollowUp;
   }
 
-  async getPendingFollowUps(): Promise<QuoteWithClient[]> {
+  async getPendingFollowUps(page: number = 1, pageSize: number = 10): Promise<{ followUps: QuoteWithClient[]; total: number }> {
+    const startTime = Date.now();
     const db = getDb();
-    if (!db) return memFallback.getPendingFollowUps();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const all = (await db.select().from(quotes)) as Quote[];
-    const pending = all.filter((quote) => {
-      if (quote.status === "Accepté" || quote.status === "Refusé") return false;
-      if (quote.plannedFollowUpDate) {
-        const planned = new Date(quote.plannedFollowUpDate);
-        planned.setHours(0, 0, 0, 0);
-        return planned <= today;
-      }
-      const last = quote.lastFollowUpDate ? new Date(quote.lastFollowUpDate) : new Date(quote.sentDate);
-      const days = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-      return days >= 7;
-    });
-    const clientIds = Array.from(new Set(pending.map((p) => p.clientId)));
-    const clientsRows = clientIds.length
-      ? ((await db.select().from(clients).where(sql`${clients.id} in (${sql.join(clientIds, sql`,`)})`)) as Client[])
-      : [];
-    const map = new Map<string, Client>();
-    clientsRows.forEach((c) => map.set((c as any).id, c));
-    return pending
-      .map((q) => ({ ...(q as any), client: map.get(q.clientId)! }))
-      .filter((q) => q.client);
+    if (!db) return memFallback.getPendingFollowUps(page, pageSize);
+    
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+
+      // Complex query with proper joins and filtering - done at database level
+      const allPendingRows = await db
+        .select({
+          // Quote fields
+          id: quotes.id,
+          reference: quotes.reference,
+          clientId: quotes.clientId,
+          description: quotes.description,
+          amount: quotes.amount,
+          sentDate: quotes.sentDate,
+          status: quotes.status,
+          notes: quotes.notes,
+          lastFollowUpDate: quotes.lastFollowUpDate,
+          plannedFollowUpDate: quotes.plannedFollowUpDate,
+          acceptedAt: quotes.acceptedAt,
+          createdAt: quotes.createdAt,
+          // Client fields
+          clientName: clients.name,
+          clientCompany: clients.company,
+          clientEmail: clients.email,
+          clientPhone: clients.phone,
+          clientPosition: clients.position,
+          clientCreatedAt: clients.createdAt,
+        })
+        .from(quotes)
+        .innerJoin(clients, eq(quotes.clientId, clients.id))
+        .where(
+          and(
+            // Not in final status
+            sql`${quotes.status} NOT IN ('Accepté', 'Refusé')`,
+            // Either planned date is due OR 7+ days since last follow-up
+            or(
+              sql`${quotes.plannedFollowUpDate} <= ${todayStr}`,
+              and(
+                sql`${quotes.plannedFollowUpDate} IS NULL`,
+                sql`COALESCE(${quotes.lastFollowUpDate}, ${quotes.sentDate}) <= ${todayStr} - INTERVAL '7 days'`
+              )
+            )
+          )
+        );
+
+      // Transform to QuoteWithClient format
+      const pendingFollowUps: QuoteWithClient[] = allPendingRows.map(row => ({
+        id: row.id,
+        reference: row.reference,
+        clientId: row.clientId,
+        description: row.description,
+        amount: row.amount,
+        sentDate: row.sentDate,
+        status: row.status,
+        notes: row.notes,
+        lastFollowUpDate: row.lastFollowUpDate,
+        plannedFollowUpDate: row.plannedFollowUpDate,
+        acceptedAt: row.acceptedAt,
+        createdAt: row.createdAt,
+        client: {
+          id: row.clientId,
+          name: row.clientName,
+          company: row.clientCompany,
+          email: row.clientEmail,
+          phone: row.clientPhone,
+          position: row.clientPosition,
+          createdAt: row.clientCreatedAt,
+        }
+      }));
+
+      const total = pendingFollowUps.length;
+      const start = (page - 1) * pageSize;
+      const followUps = pendingFollowUps.slice(start, start + pageSize);
+
+      const duration = Date.now() - startTime;
+      logger.logPerformance("getPendingFollowUps", duration, { page, pageSize, total });
+      metrics.recordSlowQuery("getPendingFollowUps", duration);
+
+      return { followUps, total };
+    } catch (error) {
+      logger.error("Error fetching pending follow-ups", { page, pageSize }, error as Error);
+      return memFallback.getPendingFollowUps(page, pageSize);
+    }
   }
 
   async getQuoteStats(): Promise<{ total: number; byStatus: Record<string, number>; conversionRate: number; averageAmount: number; monthlyRevenue: { month: string; amount: number }[]; }> {
