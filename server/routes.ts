@@ -2,12 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getDb } from "./db";
-import { insertClientSchema, insertQuoteSchema, insertFollowUpSchema } from "@shared/schema";
+import { insertClientSchema, insertQuoteSchema, insertFollowUpSchema, clients } from "@shared/schema";
 import { z } from "zod";
 import { requireAuth, login, logout, register } from "./auth";
 import rateLimit from "express-rate-limit";
 import PDFDocument from "pdfkit";
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "./logger";
+import { metrics } from "./metrics";
 
 function escapeCsvField(value: unknown): string {
   const raw = value == null ? "" : String(value);
@@ -71,6 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Client routes
   app.get("/api/clients", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
+    const startTime = Date.now();
     try {
       const search = req.query.search as string | undefined;
       const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
@@ -78,16 +81,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sortBy = (req.query.sortBy as string) || "name"; // name | company | email
       const sortDir = ((req.query.sortDir as string) || "asc").toLowerCase() === "desc" ? "desc" : "asc";
 
-      let list = await storage.getClients(search);
+      const result = await storage.getClients(search, page, pageSize);
+      
+      // Apply sorting to the clients array
       if (["name", "company", "email"].includes(sortBy)) {
-        list = list.sort((a: any, b: any) => (sortDir === "asc" ? 1 : -1) * String(a[sortBy]).localeCompare(String(b[sortBy])));
+        result.clients = result.clients.sort((a: any, b: any) => 
+          (sortDir === "asc" ? 1 : -1) * String(a[sortBy]).localeCompare(String(b[sortBy]))
+        );
       }
-      const total = list.length;
-      const start = (page - 1) * pageSize;
-      const items = list.slice(start, start + pageSize);
-      res.setHeader("X-Total-Count", String(total));
-      res.json(items);
+
+      res.setHeader("X-Total-Count", String(result.total));
+      res.json(result.clients);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/clients", duration, { 
+        search, page, pageSize, total: result.total 
+      });
     } catch (error) {
+      logger.error("Error in GET /api/clients", { search: req.query.search }, error as Error);
       res.status(500).json({ message: "Erreur lors de la récupération des clients" });
     }
   });
@@ -147,6 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Quote routes
   app.get("/api/quotes", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
+    const startTime = Date.now();
     try {
       const filters = {
         status: req.query.status as string | undefined,
@@ -154,13 +167,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
       const pageSize = Math.min(Math.max(parseInt((req.query.pageSize as string) || "10", 10), 1), 200);
-      let quotes = await storage.getQuotes(filters);
-      const total = quotes.length;
-      const start = (page - 1) * pageSize;
-      const items = quotes.slice(start, start + pageSize);
-      res.setHeader("X-Total-Count", String(total));
-      res.json(items);
+      
+      const result = await storage.getQuotes(filters, page, pageSize);
+      res.setHeader("X-Total-Count", String(result.total));
+      res.json(result.quotes);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/quotes", duration, { 
+        filters, page, pageSize, total: result.total 
+      });
     } catch (error) {
+      logger.error("Error in GET /api/quotes", { filters: req.query }, error as Error);
       res.status(500).json({ message: "Erreur lors de la récupération des devis" });
     }
   });
@@ -245,10 +263,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/pending-follow-ups", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
+    const startTime = Date.now();
     try {
-      const pendingFollowUps = await storage.getPendingFollowUps();
-      res.json(pendingFollowUps);
+      const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
+      const pageSize = Math.min(Math.max(parseInt((req.query.pageSize as string) || "10", 10), 1), 50);
+      
+      const result = await storage.getPendingFollowUps(page, pageSize);
+      res.setHeader("X-Total-Count", String(result.total));
+      res.json(result.followUps);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/pending-follow-ups", duration, { 
+        page, pageSize, total: result.total 
+      });
     } catch (error) {
+      logger.error("Error in GET /api/pending-follow-ups", { page: req.query.page }, error as Error);
       res.status(500).json({ message: "Erreur lors de la récupération des relances en attente" });
     }
   });
@@ -263,26 +293,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Healthcheck route
+  // Enhanced healthcheck route with detailed metrics
   app.get("/api/health", async (_req, res) => {
-    const startedAt = new Date(Date.now() - Math.floor(process.uptime() * 1000));
-    const db = getDb();
-    const dbConnected = !!db;
-    const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-    res.json({
-      status: "ok",
-      env: app.get("env"),
-      uptimeSec: Math.floor(process.uptime()),
-      startedAt: startedAt.toISOString(),
-      db: { connected: dbConnected },
-      smtp: { configured: smtpConfigured },
-    });
+    const startTime = Date.now();
+    try {
+      const startedAt = new Date(Date.now() - Math.floor(process.uptime() * 1000));
+      const db = getDb();
+      let dbConnected = false;
+      let dbLatency = 0;
+
+      // Test database connection and measure latency
+      if (db) {
+        try {
+          const dbStart = Date.now();
+          await db.select().from(clients).limit(1);
+          dbLatency = Date.now() - dbStart;
+          dbConnected = true;
+        } catch {
+          dbConnected = false;
+        }
+      }
+
+      const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+      const memoryUsage = process.memoryUsage();
+      const performance = metrics.getMetrics();
+
+      const healthStatus = {
+        status: dbConnected ? "healthy" : "degraded",
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(process.uptime()),
+        startedAt: startedAt.toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        version: process.env.npm_package_version || "1.0.0",
+        database: {
+          connected: dbConnected,
+          latency: dbLatency,
+        },
+        smtp: {
+          configured: smtpConfigured,
+        },
+        memory: {
+          usage: memoryUsage,
+          usageMB: {
+            rss: Math.round(memoryUsage.rss / 1024 / 1024 * 100) / 100,
+            heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024 * 100) / 100,
+            heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024 * 100) / 100,
+            external: Math.round(memoryUsage.external / 1024 / 1024 * 100) / 100,
+          }
+        },
+        performance: {
+          totalRequests: performance.totalRequests,
+          averageResponseTime: performance.averageResponseTime,
+          requestsByStatus: performance.requestsByStatus,
+        }
+      };
+
+      res.json(healthStatus);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.info("Health check completed", { duration, healthStatus: healthStatus.status });
+    } catch (error) {
+      logger.error("Health check failed", {}, error as Error);
+      res.status(503).json({
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: "Health check failed"
+      });
+    }
+  });
+
+  // Performance metrics endpoint
+  app.get("/api/metrics", requireAuth(["admin"]), async (_req, res) => {
+    const startTime = Date.now();
+    try {
+      const performance = metrics.getMetrics();
+      res.json(performance);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.info("Metrics accessed", { duration });
+    } catch (error) {
+      logger.error("Error retrieving metrics", {}, error as Error);
+      res.status(500).json({ message: "Erreur lors de la récupération des métriques" });
+    }
+  });
+
+  // Reset metrics endpoint (admin only)
+  app.post("/api/metrics/reset", requireAuth(["admin"]), async (_req, res) => {
+    try {
+      metrics.reset();
+      res.json({ message: "Métriques réinitialisées avec succès" });
+      logger.info("Metrics reset by admin");
+    } catch (error) {
+      logger.error("Error resetting metrics", {}, error as Error);
+      res.status(500).json({ message: "Erreur lors de la réinitialisation des métriques" });
+    }
   });
 
   // CSV export route
   app.get("/api/export/quotes", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
+    const startTime = Date.now();
     try {
-      const quotes = await storage.getQuotes();
+      const result = await storage.getQuotes({}, 1, 10000); // Get all quotes for export
+      const quotes = result.quotes;
 
       // Generate CSV (RFC 4180 + BOM for Excel)
       const headers = [
@@ -309,15 +423,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="devis.csv"');
       res.send(csv);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/export/quotes", duration, { 
+        exportType: "csv", count: quotes.length 
+      });
     } catch (error) {
+      logger.error("Error in CSV export", {}, error as Error);
       res.status(500).json({ message: "Erreur lors de l'export CSV" });
     }
   });
 
   // PDF export (server-side using pdfkit)
   app.get("/api/export/quotes.pdf", requireAuth(["admin", "manager", "sales"]), async (_req, res) => {
+    const startTime = Date.now();
     try {
-      const quotes = await storage.getQuotes();
+      const result = await storage.getQuotes({}, 1, 10000); // Get all quotes for export
+      const quotes = result.quotes;
+      
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", 'attachment; filename="devis.pdf"');
       
@@ -480,8 +604,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       doc.end();
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/export/quotes.pdf", duration, { 
+        exportType: "pdf", count: quotes.length 
+      });
     } catch (error) {
-      console.error("PDF generation error:", error);
+      logger.error("PDF generation error", {}, error as Error);
       res.status(500).json({ message: "Erreur lors de l'export PDF" });
     }
   });
