@@ -31,10 +31,15 @@
  *     node test-optipenn-app.cjs --module dashboard # Run only dashboard tests
  */
 
-const { chromium } = require('playwright');
-const { spawn } = require('child_process');
-const fs = require('fs').promises;
-const path = require('path');
+import { chromium } from 'playwright';
+import { spawn } from 'child_process';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const CONFIG = {
@@ -1320,6 +1325,7 @@ process.on('SIGTERM', async () => {
     process.exit(1);
 });
 
-if (require.main === module) {
+// ES module equivalent of checking if this file is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
     main().catch(console.error);
 }
