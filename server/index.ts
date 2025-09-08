@@ -2,6 +2,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
+import { validateEnvironmentVariablesOrThrow } from "./env-validation";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
@@ -63,21 +64,22 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 (async () => {
+  // Validation obligatoire des variables d'environnement sensibles
+  try {
+    log("Validation des variables d'environnement...");
+    validateEnvironmentVariablesOrThrow();
+    log("✓ Variables d'environnement validées avec succès");
+  } catch (error) {
+    console.error("\n" + (error as Error).message);
+    process.exit(1);
+  }
+
   const server = await registerRoutes(app);
   // start schedulers
   try {
     const { startSchedulers } = await import("./notifications");
     startSchedulers();
   } catch {}
-
-  // Validate environment in production
-  if (app.get("env") === "production") {
-    const required = ["DATABASE_URL", "JWT_SECRET"] as const;
-    const missing = required.filter((k) => !process.env[k]);
-    if (missing.length) {
-      throw new Error(`Variables d'environnement manquantes: ${missing.join(", ")}`);
-    }
-  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

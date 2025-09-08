@@ -16,10 +16,25 @@ Installation
    npm run dev
 
 Variables d'environnement (.env)
-- DATABASE_URL=postgres://user:pass@host/db
-- JWT_SECRET=change-me
-- SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM (optionnel)
-- SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD (optionnel)
+**⚠️ VALIDATION OBLIGATOIRE ⚠️**
+
+L'application valide automatiquement toutes les variables d'environnement au démarrage. Les variables sensibles sont obligatoires et doivent respecter des critères de sécurité.
+
+**Variables obligatoires:**
+- DATABASE_URL=postgres://user:pass@host/db (URL de connexion PostgreSQL)
+- JWT_SECRET=your-secret-key (32+ caractères en production)
+
+**Variables optionnelles:**
+- SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM (email)
+- CORS_ORIGIN, COOKIE_DOMAIN (sécurité)
+- SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD (initialisation)
+
+**Configuration:**
+1. Copiez .env.example vers .env
+2. Remplissez les variables obligatoires
+3. L'application vérifiera la configuration au démarrage
+
+Voir [ENV_VALIDATION.md](ENV_VALIDATION.md) pour la documentation complète.
 
 Scripts
 - npm run dev: démarre API + Vite en mode dev

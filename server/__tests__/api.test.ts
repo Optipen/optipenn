@@ -9,6 +9,11 @@ let server: import('http').Server;
 
 describe('API', () => {
   beforeAll(async () => {
+    // Set required environment variables for tests
+    process.env.DATABASE_URL = 'postgres://test:test@localhost/testdb';
+    process.env.JWT_SECRET = 'test-jwt-secret-for-api-tests-12345678';
+    process.env.NODE_ENV = 'test';
+    
     app = express();
     app.use(express.json());
     app.use(cookieParser());
@@ -29,13 +34,13 @@ describe('API', () => {
       .expect(201);
 
     const loginRes = await request(app).post('/api/auth/login').send({ email, password }).expect(200);
-    const cookies = loginRes.headers['set-cookie'];
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[];
     expect(cookies).toBeTruthy();
     const tokenCookie = cookies.find((c: string) => c.startsWith('crm_token='));
     const csrfCookie = cookies.find((c: string) => c.startsWith('csrf_token='));
     expect(tokenCookie).toBeTruthy();
     expect(csrfCookie).toBeTruthy();
-    const csrf = /csrf_token=([^;]+)/.exec(csrfCookie)![1];
+    const csrf = /csrf_token=([^;]+)/.exec(csrfCookie!)![1];
 
     await request(app)
       .get('/api/statistics')
