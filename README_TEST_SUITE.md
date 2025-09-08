@@ -26,14 +26,24 @@ npm install
 # Install Playwright browsers
 npx playwright install
 
-# Run all tests
+# Run all tests (CommonJS version)
 npm run test:e2e
 
-# Run specific test module
+# Run all tests (ES Module version)
+npm run test:e2e:esm
+
+# Run specific test module (CommonJS)
 npm run test:e2e:module dashboard
 npm run test:e2e:module login
 npm run test:e2e:module clients
+
+# Run specific test module (ES Module)
+node test-optipenn-app.js --module dashboard
 ```
+
+**Note**: Two versions are available:
+- `test-optipenn-app.cjs` - CommonJS version (traditional require/module.exports)
+- `test-optipenn-app.js` - ES Module version (import/export) - compatible with package.json "type": "module"
 
 ### Option 2: Python Version
 

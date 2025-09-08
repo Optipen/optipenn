@@ -16,6 +16,7 @@
     "test:demo": "node demo-test-suite.cjs",
     "test:basic": "node test-basic.cjs",
     "test:e2e": "node test-optipenn-app.cjs",
+    "test:e2e:esm": "node test-optipenn-app.js",
     "test:e2e:python": "python test_optipenn_app.py",
     "test:e2e:module": "node test-optipenn-app.cjs --module"
   },
