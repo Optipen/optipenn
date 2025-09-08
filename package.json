@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx server/seed.ts",
     "test": "vitest run",
+    "test:demo": "node demo-test-suite.cjs",
     "test:basic": "node test-basic.cjs",
     "test:e2e": "node test-optipenn-app.js",
     "test:e2e:python": "python test_optipenn_app.py",

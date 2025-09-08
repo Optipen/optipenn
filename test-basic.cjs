@@ -41,27 +41,11 @@ async function startApp() {
         // App not running, start it
     }
     
-    const serverProcess = spawn('npm', ['run', 'demo'], {
-        cwd: process.cwd(),
-        stdio: 'inherit'
-    });
+    console.log('📝 Note: Please start the application manually with:');
+    console.log('   npm run demo');
+    console.log('   Then run this test again.');
     
-    // Wait for server to start
-    console.log('⏳ Waiting for server to start...');
-    
-    for (let i = 0; i < 60; i++) {
-        try {
-            const response = await fetch('http://localhost:5000/api/health');
-            if (response.ok) {
-                console.log('✅ Server started successfully');
-                return serverProcess;
-            }
-        } catch (e) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    }
-    
-    throw new Error('❌ Server failed to start within timeout');
+    throw new Error('Application not running. Please start it first.');
 }
 
 async function runBasicTests() {

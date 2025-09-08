@@ -10,6 +10,12 @@ client/__tests__/
 coverage/
 *.test.log
 
+# Automated test artifacts
+test_screenshots/
+test_reports/
+*.png
+*.mp4
+
 # Temporary files
 .tmp/
 temp/
