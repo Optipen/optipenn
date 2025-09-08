@@ -71,6 +71,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", strictLoginLimiter, loginLimiter, login);
   app.post("/api/auth/logout", csrfProtect, logout);
 
+  // Status endpoint - shows demo mode banner
+  app.get("/api/status", (req, res) => {
+    const isDemoMode = process.env.DEMO_MODE === "1";
+    res.json({
+      status: "OK",
+      environment: process.env.NODE_ENV || "development",
+      demoMode: isDemoMode,
+      ...(isDemoMode && {
+        banner: "🎭 MODE DÉMO ACTIVÉ - Ne pas utiliser en production",
+        warning: "Toutes les données sont temporaires et disparaîtront au redémarrage"
+      })
+    });
+  });
+
   // Global search endpoint
   app.get("/api/search/global", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
     const startTime = Date.now();
