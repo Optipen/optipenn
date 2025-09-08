@@ -1,6 +1,6 @@
 import { type Client, type Quote, type FollowUp, type InsertClient, type InsertQuote, type InsertFollowUp, type QuoteWithClient, type InsertUser, type User, clients, quotes, followUps, users } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { getDb } from "./db";
+import { getDb, withSafeDelete } from "./db";
 import { desc, eq, sql } from "drizzle-orm";
 
 export interface IStorage {
@@ -10,6 +10,7 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
+  deleteClientWithData(id: string): Promise<boolean>; // Transactional cascade deletion with verification
 
   // Quotes
   getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]>;
@@ -104,6 +105,11 @@ export class MemStorage implements IStorage {
     });
     
     return this.clients.delete(id);
+  }
+
+  async deleteClientWithData(id: string): Promise<boolean> {
+    // For in-memory storage, this is the same as deleteClient
+    return this.deleteClient(id);
   }
 
   async getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]> {
@@ -381,9 +387,62 @@ class SqlStorage implements IStorage {
   async deleteClient(id: string): Promise<boolean> {
     const db = getDb();
     if (!db) return memFallback.deleteClient(id);
-    // Rely on ON DELETE CASCADE constraints defined in schema
-    await db.delete(clients).where(eq(clients.id, id));
-    return true;
+    
+    // Use safe delete with cascade constraints for data integrity
+    try {
+      return await withSafeDelete(db, async (db) => {
+        // Check if client exists before deletion
+        const [existingClient] = await db.select().from(clients).where(eq(clients.id, id));
+        if (!existingClient) {
+          return false;
+        }
+        
+        // Delete client - cascade constraints will handle quotes and follow-ups automatically
+        // This is atomic at the database level due to foreign key constraints
+        await db.delete(clients).where(eq(clients.id, id));
+        return true;
+      });
+    } catch (error) {
+      // Log error for debugging but return false to indicate failure
+      console.error('Error deleting client:', error);
+      return false;
+    }
+  }
+
+  async deleteClientWithData(id: string): Promise<boolean> {
+    const db = getDb();
+    if (!db) return memFallback.deleteClientWithData(id);
+    
+    // Enhanced safe deletion with verification and logging
+    try {
+      return await withSafeDelete(db, async (db) => {
+        // Check if client exists and get related data counts for logging
+        const [existingClient] = await db.select().from(clients).where(eq(clients.id, id));
+        if (!existingClient) {
+          return false;
+        }
+        
+        // Get counts for audit logging (optional)
+        const clientQuotes = await db.select({ id: quotes.id }).from(quotes).where(eq(quotes.clientId, id));
+        const quoteIds = clientQuotes.map(q => q.id);
+        
+        let followUpCount = 0;
+        if (quoteIds.length > 0) {
+          const followUpCounts = await db.select({ count: sql<number>`count(*)` }).from(followUps).where(sql`${followUps.quoteId} = ANY(${quoteIds})`);
+          followUpCount = followUpCounts[0]?.count || 0;
+        }
+        
+        // Log the cascade deletion for audit purposes
+        console.log(`Deleting client ${id} with ${clientQuotes.length} quotes and ${followUpCount} follow-ups`);
+        
+        // Delete client - cascade constraints ensure all related data is deleted atomically
+        await db.delete(clients).where(eq(clients.id, id));
+        return true;
+      });
+    } catch (error) {
+      console.error('Error deleting client with data:', error);
+      return false;
+    }
   }
 
   async getQuotes(filters?: { status?: string; clientId?: string }): Promise<QuoteWithClient[]> {
@@ -435,9 +494,26 @@ class SqlStorage implements IStorage {
   async deleteQuote(id: string): Promise<boolean> {
     const db = getDb();
     if (!db) return memFallback.deleteQuote(id);
-    await db.delete(followUps).where(eq(followUps.quoteId, id));
-    await db.delete(quotes).where(eq(quotes.id, id));
-    return true;
+    
+    // Use safe delete with cascade constraints for data integrity
+    try {
+      return await withSafeDelete(db, async (db) => {
+        // Check if quote exists before deletion
+        const [existingQuote] = await db.select().from(quotes).where(eq(quotes.id, id));
+        if (!existingQuote) {
+          return false;
+        }
+        
+        // Delete quote - cascade constraints will handle follow-ups automatically
+        // This is atomic at the database level due to foreign key constraints
+        await db.delete(quotes).where(eq(quotes.id, id));
+        return true;
+      });
+    } catch (error) {
+      // Log error for debugging but return false to indicate failure
+      console.error('Error deleting quote:', error);
+      return false;
+    }
   }
 
   async getQuotesByClientId(clientId: string): Promise<Quote[]> {
