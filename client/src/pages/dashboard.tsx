@@ -1,11 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, Percent, Euro, User, AlertTriangle } from "lucide-react";
+import { FileText, Clock, Percent, Euro, User, AlertTriangle, Calendar } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { QuoteWithClient } from "@shared/schema";
 
 export default function Dashboard() {
+  const { toast } = useToast();
+  
   const { data: quotes = [], isLoading: quotesLoading } = useQuery<QuoteWithClient[]>({
     queryKey: ["/api/quotes"],
   });
@@ -17,6 +21,76 @@ export default function Dashboard() {
   const { data: pendingFollowUps = [], isLoading: pendingLoading } = useQuery<QuoteWithClient[]>({
     queryKey: ["/api/pending-follow-ups"],
   });
+
+  const followUpMutation = useMutation({
+    mutationFn: ({ quoteId, comment }: { quoteId: string; comment: string }) =>
+      apiRequest("POST", `/api/quotes/${quoteId}/follow-up`, {
+        date: new Date().toISOString().split('T')[0],
+        comment,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pending-follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/statistics"] });
+      toast({
+        title: "Succès",
+        description: "Relance effectuée avec succès",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la relance",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateQuoteMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { plannedFollowUpDate: string } }) =>
+      apiRequest("PUT", `/api/quotes/${id}`, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pending-follow-ups"] });
+      toast({
+        title: "Succès",
+        description: "Relance planifiée mise à jour",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de planifier la relance",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFollowUp = (quote: QuoteWithClient) => {
+    const comment = prompt(`Relance pour ${quote.client.company} - Commentaire (optionnel) :`);
+    if (comment !== null) {
+      followUpMutation.mutate({ 
+        quoteId: quote.id, 
+        comment: comment || `Relance automatique depuis le tableau de bord` 
+      });
+    }
+  };
+
+  const handlePlanFollowUp = (quote: QuoteWithClient) => {
+    const current = quote.plannedFollowUpDate || "";
+    const input = prompt(`Planifier relance pour ${quote.client.company} (YYYY-MM-DD)`, current);
+    if (input === null) return;
+    const trimmed = input.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      toast({ 
+        title: "Format invalide", 
+        description: "Utilisez le format YYYY-MM-DD", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    updateQuoteMutation.mutate({ id: quote.id, updates: { plannedFollowUpDate: trimmed } });
+  };
 
   if (quotesLoading || statsLoading || pendingLoading) {
     return (
@@ -270,14 +344,27 @@ export default function Dashboard() {
                             )}
                           </div>
                         </div>
-                        <Button 
-                          size="sm" 
-                          variant={isUrgent ? "destructive" : "default"}
-                          data-testid={`followup-${quote.id}`}
-                        >
-                          {isUrgent && <AlertTriangle className="w-4 h-4 mr-1" />}
-                          Relancer
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handlePlanFollowUp(quote)}
+                            disabled={updateQuoteMutation.isPending}
+                            data-testid={`plan-followup-${quote.id}`}
+                          >
+                            <Calendar className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant={isUrgent ? "destructive" : "default"}
+                            onClick={() => handleFollowUp(quote)}
+                            disabled={followUpMutation.isPending}
+                            data-testid={`followup-${quote.id}`}
+                          >
+                            {isUrgent && <AlertTriangle className="w-4 h-4 mr-1" />}
+                            {followUpMutation.isPending ? "..." : "Relancer"}
+                          </Button>
+                        </div>
                       </div>
                     );
                   })

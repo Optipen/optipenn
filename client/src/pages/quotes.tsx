@@ -9,6 +9,7 @@ import { Search, Download, Plus, Edit, Eye, Trash2, Send, AlertTriangle, Calenda
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddQuoteModal from "@/components/modals/add-quote-modal";
+import EditQuoteModal from "@/components/modals/edit-quote-modal";
 import type { QuoteWithClient } from "@shared/schema";
 
 export default function Quotes() {
@@ -17,6 +18,8 @@ export default function Quotes() {
   const pageSize = 10;
   const [statusFilter, setStatusFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteWithClient | null>(null);
   const { toast } = useToast();
 
   const { data: quotes = [], isLoading } = useQuery<QuoteWithClient[]>({
@@ -93,6 +96,11 @@ export default function Quotes() {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer le devis "${reference}" ?`)) {
       deleteQuoteMutation.mutate(id);
     }
+  };
+
+  const handleOpenEdit = (quote: QuoteWithClient) => {
+    setSelectedQuote(quote);
+    setShowEditModal(true);
   };
 
   const handleFollowUp = (quoteId: string) => {
@@ -416,6 +424,7 @@ export default function Quotes() {
                               variant="ghost" 
                               size="sm" 
                               className="text-blue-600 hover:text-blue-700"
+                              onClick={() => handleOpenEdit(quote)}
                               data-testid={`button-edit-${quote.id}`}
                             >
                               <Edit className="w-4 h-4" />
@@ -453,6 +462,11 @@ export default function Quotes() {
       <AddQuoteModal 
         open={showAddModal} 
         onOpenChange={setShowAddModal}
+      />
+      <EditQuoteModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        quote={selectedQuote}
       />
     </div>
   );
