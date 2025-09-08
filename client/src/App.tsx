@@ -10,6 +10,9 @@ import Quotes from "@/pages/quotes";
 import Statistics from "@/pages/statistics";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import GlobalSearch from "@/components/ui/global-search";
+import NotificationCenter from "@/components/ui/notification-center";
+import OnboardingTour, { useOnboardingTour } from "@/components/ui/onboarding-tour";
 import { useEffect, useState } from "react";
 import { getQueryFn } from "./lib/queryClient";
 import ErrorBoundary from "@/components/error-boundary";
@@ -46,16 +49,43 @@ function Router() {
 }
 
 function App() {
+  const { shouldShowTour, markTourCompleted } = useOnboardingTour();
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ErrorBoundary>
           <div className="flex h-screen bg-slate-50">
             <Sidebar />
-            <div className="flex-1 overflow-auto">
-              <Router />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Header avec recherche globale et notifications */}
+              <header className="bg-white border-b border-slate-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 max-w-md" data-tour="global-search">
+                    <GlobalSearch />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <NotificationCenter />
+                  </div>
+                </div>
+              </header>
+              
+              {/* Contenu principal */}
+              <div className="flex-1 overflow-auto">
+                <Router />
+              </div>
             </div>
           </div>
+          
+          {/* Tour guidé pour nouveaux utilisateurs */}
+          {shouldShowTour && (
+            <OnboardingTour
+              autoStart={true}
+              onComplete={markTourCompleted}
+              onSkip={markTourCompleted}
+            />
+          )}
+          
           <Toaster />
         </ErrorBoundary>
       </TooltipProvider>

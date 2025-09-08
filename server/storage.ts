@@ -13,6 +13,7 @@ export interface IStorage {
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
   deleteClientWithData(id: string): Promise<boolean>; // Transactional cascade deletion with verification
+  searchClients(query: string): Promise<Client[]>;
 
   // Quotes
   getQuotes(filters?: { status?: string; clientId?: string }, page?: number, pageSize?: number): Promise<{ quotes: QuoteWithClient[]; total: number }>;
@@ -21,6 +22,7 @@ export interface IStorage {
   updateQuote(id: string, quote: Partial<InsertQuote>): Promise<Quote | undefined>;
   deleteQuote(id: string): Promise<boolean>;
   getQuotesByClientId(clientId: string): Promise<Quote[]>;
+  searchQuotes(query: string): Promise<QuoteWithClient[]>;
 
   // Follow-ups
   getFollowUps(quoteId: string): Promise<FollowUp[]>;
@@ -360,6 +362,30 @@ export class MemStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const all = Array.from(this.users.values());
     return all.find((u) => u.email === email);
+  }
+
+  async searchClients(query: string): Promise<Client[]> {
+    const searchLower = query.toLowerCase();
+    return Array.from(this.clients.values()).filter(client =>
+      client.name.toLowerCase().includes(searchLower) ||
+      client.company.toLowerCase().includes(searchLower) ||
+      client.email.toLowerCase().includes(searchLower)
+    ).slice(0, 10);
+  }
+
+  async searchQuotes(query: string): Promise<QuoteWithClient[]> {
+    const searchLower = query.toLowerCase();
+    return Array.from(this.quotes.values())
+      .filter(quote =>
+        quote.reference.toLowerCase().includes(searchLower) ||
+        quote.description.toLowerCase().includes(searchLower)
+      )
+      .map(quote => {
+        const client = this.clients.get(quote.clientId);
+        return { ...quote, client } as QuoteWithClient;
+      })
+      .filter(quote => quote.client) // Only include quotes with valid clients
+      .slice(0, 10);
   }
 }
 
@@ -799,6 +825,89 @@ class SqlStorage implements IStorage {
     if (!db) return memFallback.getUserByEmail(email);
     const [row] = await db.select().from(users).where(eq(users.email, email));
     return row as User | undefined;
+  }
+
+  async searchClients(query: string): Promise<Client[]> {
+    const startTime = Date.now();
+    const db = getDb();
+    if (!db) return memFallback.searchClients(query);
+
+    try {
+      const term = `%${query.toLowerCase()}%`;
+      const rows = await db
+        .select()
+        .from(clients)
+        .where(
+          or(
+            ilike(clients.name, term),
+            ilike(clients.company, term),
+            ilike(clients.email, term)
+          )
+        )
+        .limit(10);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(200, duration);
+      logger.logPerformance("searchClients", duration, { query: query.slice(0, 20), count: rows.length });
+
+      return rows as Client[];
+    } catch (error) {
+      logger.error("Error searching clients", {}, error as Error);
+      return memFallback.searchClients(query);
+    }
+  }
+
+  async searchQuotes(query: string): Promise<QuoteWithClient[]> {
+    const startTime = Date.now();
+    const db = getDb();
+    if (!db) return memFallback.searchQuotes(query);
+
+    try {
+      const term = `%${query.toLowerCase()}%`;
+      const rows = await db
+        .select({
+          id: quotes.id,
+          reference: quotes.reference,
+          description: quotes.description,
+          amount: quotes.amount,
+          status: quotes.status,
+          sentDate: quotes.sentDate,
+          clientId: quotes.clientId,
+          createdAt: quotes.createdAt,
+          client: {
+            id: clients.id,
+            name: clients.name,
+            email: clients.email,
+            company: clients.company,
+            phone: clients.phone,
+            position: clients.position,
+            createdAt: clients.createdAt,
+          },
+        })
+        .from(quotes)
+        .leftJoin(clients, eq(quotes.clientId, clients.id))
+        .where(
+          or(
+            ilike(quotes.reference, term),
+            ilike(quotes.description, term),
+            ilike(clients.name, term),
+            ilike(clients.company, term)
+          )
+        )
+        .limit(10);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(200, duration);
+      logger.logPerformance("searchQuotes", duration, { query: query.slice(0, 20), count: rows.length });
+
+      return rows.map(row => ({
+        ...row,
+        client: row.client || undefined,
+      })) as QuoteWithClient[];
+    } catch (error) {
+      logger.error("Error searching quotes", {}, error as Error);
+      return memFallback.searchQuotes(query);
+    }
   }
 }
 
