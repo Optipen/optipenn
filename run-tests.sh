@@ -213,9 +213,9 @@ main() {
     else
         print_status "Running Node.js test suite..."
         if [ -n "$TEST_MODULE" ]; then
-            node test-optipenn-app.js --module "$TEST_MODULE"
+            node test-optipenn-app.cjs --module "$TEST_MODULE"
         else
-            node test-optipenn-app.js
+            node test-optipenn-app.cjs
         fi
     fi
     

@@ -228,7 +228,7 @@ The test suite specifically validates:
 For debugging, modify the browser launch options:
 
 ```javascript
-// In test-optipenn-app.js
+// In test-optipenn-app.cjs
 this.browser = await chromium.launch({
     headless: false,  // Shows browser window
     slowMo: 1000,     // Slows down actions
