@@ -58,12 +58,22 @@ describe('Authentication Security', () => {
 
     // Check JWT cookie security attributes
     expect(tokenCookie).toContain('HttpOnly');
-    expect(tokenCookie).toContain('SameSite=Lax'); // Should be Lax in development
-    expect(tokenCookie).not.toContain('Secure'); // Should not be Secure in development
+    
+    if (process.env.NODE_ENV === 'production') {
+      expect(tokenCookie).toContain('SameSite=Strict');
+      expect(tokenCookie).toContain('Secure');
+    } else {
+      expect(tokenCookie).toContain('SameSite=Lax'); // Should be Lax in development
+      expect(tokenCookie).not.toContain('Secure'); // Should not be Secure in development
+    }
     
     // Check CSRF cookie attributes  
     expect(csrfCookie).not.toContain('HttpOnly'); // CSRF token should be accessible to JS
-    expect(csrfCookie).toContain('SameSite=Lax');
+    if (process.env.NODE_ENV === 'production') {
+      expect(csrfCookie).toContain('SameSite=Strict');
+    } else {
+      expect(csrfCookie).toContain('SameSite=Lax');
+    }
   });
 
   it('validates JWT token expiration is reasonable', async () => {
@@ -88,8 +98,11 @@ describe('Authentication Security', () => {
     // Check Max-Age is present (indicates proper expiration)
     expect(tokenCookie).toContain('Max-Age=');
     
-    // In development mode, should be 7 days (604800 seconds)
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV === 'production') {
+      // In production mode, should be 2 hours (7200 seconds)
+      expect(tokenCookie).toContain('Max-Age=7200');
+    } else {
+      // In development mode, should be 7 days (604800 seconds)
       expect(tokenCookie).toContain('Max-Age=604800');
     }
   });
