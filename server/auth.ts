@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { insertUserSchema } from "@shared/schema";
+import { validateSingleEnvironmentVariable } from "./env-validation";
 
 const envJwtSecret = process.env.JWT_SECRET;
 const JWT_SECRET = envJwtSecret || "dev-secret-change";
@@ -11,8 +12,9 @@ const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 
 // Validate JWT_SECRET in production
 function validateProductionConfig() {
-  if (isProduction() && !envJwtSecret) {
-    throw new Error("JWT_SECRET manquant en production");
+  const validation = validateSingleEnvironmentVariable("JWT_SECRET");
+  if (!validation.valid) {
+    throw new Error(validation.error || "JWT_SECRET validation failed");
   }
 }
 
@@ -106,7 +108,7 @@ export async function login(req: Request, res: Response) {
   // Successful login
   console.info(`[AUTH] Successful login for user: ${email} from IP: ${clientIP}`);
   
-  const token = jwt.sign(
+  const token = (jwt as any).sign(
     { sub: user.id, role: (user as any).role, name: (user as any).name, email: user.email }, 
     JWT_SECRET, 
     { expiresIn: getJwtExpiration() }

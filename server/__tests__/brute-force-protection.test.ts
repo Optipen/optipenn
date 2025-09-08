@@ -9,6 +9,11 @@ let server: import('http').Server;
 
 describe('Brute-force Protection', () => {
   beforeAll(async () => {
+    // Set required environment variables for tests
+    process.env.DATABASE_URL = 'postgres://test:test@localhost/testdb';
+    process.env.JWT_SECRET = 'test-jwt-secret-for-brute-force-tests-12345678';
+    process.env.NODE_ENV = 'test';
+    
     app = express();
     app.use(express.json());
     app.use(cookieParser());

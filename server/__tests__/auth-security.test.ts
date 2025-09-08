@@ -9,6 +9,11 @@ let server: import('http').Server;
 
 describe('Authentication Security', () => {
   beforeAll(async () => {
+    // Set required environment variables for tests
+    process.env.DATABASE_URL = 'postgres://test:test@localhost/testdb';
+    process.env.JWT_SECRET = 'test-jwt-secret-for-auth-tests-12345678';
+    process.env.NODE_ENV = 'test';
+    
     app = express();
     app.use(express.json());
     app.use(cookieParser());
@@ -46,7 +51,7 @@ describe('Authentication Security', () => {
       .send({ email, password })
       .expect(200);
 
-    const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[] | undefined;
     expect(cookies).toBeTruthy();
     expect(Array.isArray(cookies)).toBe(true);
     
@@ -90,7 +95,7 @@ describe('Authentication Security', () => {
       .send({ email, password })
       .expect(200);
 
-    const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+    const cookies = loginRes.headers['set-cookie'] as unknown as string[] | undefined;
     const tokenCookie = cookies!.find((c: string) => c.startsWith('crm_token='));
     
     expect(tokenCookie).toBeTruthy();
@@ -121,7 +126,7 @@ describe('Authentication Security', () => {
       .send({ email, password })
       .expect(200);
 
-    const loginCookies = loginRes.headers['set-cookie'] as string[];
+    const loginCookies = loginRes.headers['set-cookie'] as unknown as string[];
     
     // Extract CSRF token for logout request
     const csrfCookie = loginCookies.find((c: string) => c.startsWith('csrf_token='));
@@ -133,7 +138,7 @@ describe('Authentication Security', () => {
       .set('X-CSRF-Token', decodeURIComponent(csrf))
       .expect(200);
 
-    const logoutCookies = logoutRes.headers['set-cookie'] as string[] | undefined;
+    const logoutCookies = logoutRes.headers['set-cookie'] as unknown as string[] | undefined;
     expect(logoutCookies).toBeTruthy();
     
     // Check that cookies are being cleared
