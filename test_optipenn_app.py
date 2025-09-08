@@ -182,6 +182,7 @@ class OptipennTester:
         self.server_process = None
         self.test_results: List[TestResult] = []
         self.start_time = datetime.now()
+        self.user_data_dir = None
         self.setup_directories()
         self.setup_logging()
         
@@ -250,16 +251,25 @@ class OptipennTester:
         """Initialize the Chrome WebDriver with optimal settings"""
         try:
             chrome_options = Options()
+            chrome_options.add_argument('--headless')  # Use headless mode for CI/testing
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--window-size=1920,1080')
+            
+            # Create unique user data directory to avoid conflicts
+            user_data_dir = Path(__file__).parent / 'browser_data' / f'session_{int(time.time() * 1000)}'
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
             
             # Enterprise-focused settings
             chrome_options.add_argument('--disable-web-security')
             chrome_options.add_argument('--allow-running-insecure-content')
             chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            
+            # Store user data dir for cleanup
+            self.user_data_dir = user_data_dir
             
             self.driver = webdriver.Chrome(options=chrome_options)
             self.driver.implicitly_wait(Config.TIMEOUT)
@@ -1262,6 +1272,15 @@ class OptipennTester:
             if self.driver:
                 self.driver.quit()
                 self.logger.info("Browser closed")
+            
+            # Cleanup browser data directory
+            if self.user_data_dir and self.user_data_dir.exists():
+                try:
+                    import shutil
+                    shutil.rmtree(self.user_data_dir)
+                    self.logger.info("Browser data directory cleaned up")
+                except Exception as e:
+                    self.logger.warn(f"Could not cleanup browser data directory: {e}")
             
             if self.server_process:
                 self.server_process.terminate()
