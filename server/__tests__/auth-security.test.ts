@@ -39,7 +39,7 @@ describe('Authentication Security', () => {
 
   it('sets secure cookie attributes for JWT tokens', async () => {
     // register
-    const email = `security-test@example.com`;
+    const email = `security-test@company.fr`;
     const password = 'Strong1234';
     await request(app)
       .post('/api/auth/register')
@@ -83,7 +83,7 @@ describe('Authentication Security', () => {
 
   it('validates JWT token expiration is reasonable', async () => {
     // In development, tokens should last 7 days, in production they should be shorter
-    const email = `expiration-test@example.com`;
+    const email = `expiration-test@company.fr`;
     const password = 'Strong1234';
     await request(app)
       .post('/api/auth/register')
@@ -113,7 +113,7 @@ describe('Authentication Security', () => {
   });
 
   it('properly clears cookies on logout', async () => {
-    const email = `logout-test@example.com`;
+    const email = `logout-test@company.fr`;
     const password = 'Strong1234';
     
     await request(app)
