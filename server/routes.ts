@@ -372,13 +372,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GDPR: delete all data for a client (alias of delete client)
+  // GDPR: delete all data for a client (enhanced with audit logging)
   app.delete("/api/gdpr/clients/:id", csrfProtect, requireAuth(["admin"]), async (req, res) => {
     try {
-      const ok = await storage.deleteClient(req.params.id);
+      const ok = await storage.deleteClientWithData(req.params.id);
       if (!ok) return res.status(404).json({ message: "Client non trouvé" });
-      res.json({ message: "Données client supprimées" });
-    } catch {
+      res.json({ message: "Données client supprimées avec cascade transactionnel" });
+    } catch (error) {
+      console.error('GDPR deletion error:', error);
       res.status(500).json({ message: "Erreur lors de la suppression RGPD" });
     }
   });
