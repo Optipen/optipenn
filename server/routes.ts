@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { getDb } from "./db";
-import { insertClientSchema, insertQuoteSchema, insertFollowUpSchema, clients } from "@shared/schema";
+import { insertClientSchema, insertQuoteSchema, insertFollowUpSchema, clients, type Client, type QuoteWithClient } from "@shared/schema";
 import { z } from "zod";
 import { requireAuth, login, logout, register } from "./auth";
 import rateLimit from "express-rate-limit";
@@ -70,6 +70,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", registerLimiter, register);
   app.post("/api/auth/login", strictLoginLimiter, loginLimiter, login);
   app.post("/api/auth/logout", csrfProtect, logout);
+
+  // Global search endpoint
+  app.get("/api/search/global", requireAuth(["admin", "manager", "sales"]), async (req, res) => {
+    const startTime = Date.now();
+    try {
+      const query = (req.query.q as string) || "";
+      if (query.length < 2) {
+        return res.json([]);
+      }
+
+      const searchTerm = `%${query.toLowerCase()}%`;
+      const results: any[] = [];
+
+      // Search clients
+      const clientResults = await storage.searchClients(searchTerm);
+      clientResults.forEach((client: Client) => {
+        results.push({
+          id: `client-${client.id}`,
+          type: "client",
+          title: client.name,
+          subtitle: client.company,
+          description: client.email,
+          url: `/clients?highlight=${client.id}`,
+          metadata: {
+            date: client.createdAt ? new Date(client.createdAt).toLocaleDateString('fr-FR') : null,
+          }
+        });
+      });
+
+      // Search quotes
+      const quoteResults = await storage.searchQuotes(searchTerm);
+      quoteResults.forEach((quote: QuoteWithClient) => {
+        results.push({
+          id: `quote-${quote.id}`,
+          type: "quote", 
+          title: `Devis ${quote.reference}`,
+          subtitle: quote.client?.name || "Client inconnu",
+          description: quote.description,
+          url: `/quotes?highlight=${quote.id}`,
+          metadata: {
+            amount: quote.amount,
+            date: quote.sentDate ? new Date(quote.sentDate).toLocaleDateString('fr-FR') : null,
+            status: quote.status,
+          }
+        });
+      });
+
+      // Limit results and sort by relevance
+      const limitedResults = results
+        .sort((a, b) => {
+          // Prioritize exact matches in title
+          const aExactMatch = a.title.toLowerCase().includes(query.toLowerCase());
+          const bExactMatch = b.title.toLowerCase().includes(query.toLowerCase());
+          if (aExactMatch && !bExactMatch) return -1;
+          if (bExactMatch && !aExactMatch) return 1;
+          return 0;
+        })
+        .slice(0, 20);
+
+      res.json(limitedResults);
+
+      const duration = Date.now() - startTime;
+      metrics.recordRequest(res.statusCode, duration);
+      logger.logPerformance("GET /api/search/global", duration, { 
+        query: query.slice(0, 50), // Log truncated query for privacy
+        resultsCount: limitedResults.length 
+      });
+    } catch (error) {
+      logger.error("Error in global search", {}, error as Error);
+      res.status(500).json({ message: "Erreur lors de la recherche" });
+    }
+  });
 
   // Client routes
   app.get("/api/clients", requireAuth(["admin", "manager", "sales"]), async (req, res) => {

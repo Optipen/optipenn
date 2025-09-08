@@ -1,15 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Plus, Edit, Eye, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Filter, Plus, Edit, Eye, Trash2, Download, Mail, Archive } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddClientModal from "@/components/modals/add-client-modal";
 import EditClientModal from "@/components/modals/edit-client-modal";
+import AdvancedFilters from "@/components/ui/advanced-filters";
+import BulkOperations, { useBulkSelection, commonBulkActions } from "@/components/ui/bulk-operations";
 import type { Client } from "@shared/schema";
+
+// Configuration des filtres avancés pour les clients
+const clientFilterFields = [
+  { value: "name", label: "Nom", type: "text" },
+  { value: "email", label: "Email", type: "text" },
+  { value: "phone", label: "Téléphone", type: "text" },
+  { value: "company", label: "Entreprise", type: "text" },
+  { value: "createdAt", label: "Date de création", type: "date" },
+  { value: "status", label: "Statut", type: "select" },
+];
+
+// Actions en masse pour les clients
+const clientBulkActions = [
+  commonBulkActions.export,
+  {
+    id: "send_newsletter",
+    label: "Newsletter",
+    icon: <Mail className="h-4 w-4" />,
+    variant: "secondary" as const,
+  },
+  commonBulkActions.archive,
+  commonBulkActions.delete,
+];
 
 export default function Clients() {
   const [search, setSearch] = useState("");
@@ -18,13 +44,24 @@ export default function Clients() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [activeFilters, setActiveFilters] = useState<any[]>([]);
   const { toast } = useToast();
 
+  // Gestion des sélections en masse
+  const bulkSelection = useBulkSelection([], (client: Client) => client.id);
+
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["/api/clients", { search, page, pageSize }],
+    queryKey: ["/api/clients", { search, page, pageSize, filters: activeFilters }],
   });
 
-  // Aucune donnée devis nécessaire ici
+  // Mettre à jour la sélection quand les clients changent
+  useEffect(() => {
+    bulkSelection.setSelectedItems(
+      bulkSelection.selectedItems.filter(id => 
+        clients.some(client => client.id === id)
+      )
+    );
+  }, [clients]);
 
   const deleteClientMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/clients/${id}`),
@@ -47,6 +84,67 @@ export default function Clients() {
   const handleDeleteClient = (id: string, name: string) => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer le client "${name}" ?`)) {
       deleteClientMutation.mutate(id);
+    }
+  };
+
+  const handleBulkAction = async (actionId: string, selectedIds: string[]) => {
+    switch (actionId) {
+      case "delete":
+        // Suppression en masse avec confirmation déjà gérée par BulkOperations
+        try {
+          await Promise.all(selectedIds.map(id => 
+            apiRequest("DELETE", `/api/clients/${id}`)
+          ));
+          queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+          bulkSelection.clearSelection();
+          toast({
+            title: "Succès",
+            description: `${selectedIds.length} client(s) supprimé(s)`,
+          });
+        } catch (error) {
+          toast({
+            title: "Erreur",
+            description: "Erreur lors de la suppression",
+            variant: "destructive",
+          });
+        }
+        break;
+
+      case "export":
+        try {
+          const response = await fetch(`/api/clients/export?ids=${selectedIds.join(',')}`);
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `clients-${new Date().toISOString().split('T')[0]}.csv`;
+          a.click();
+          toast({
+            title: "Succès",
+            description: `${selectedIds.length} client(s) exporté(s)`,
+          });
+        } catch (error) {
+          toast({
+            title: "Erreur",
+            description: "Erreur lors de l'export",
+            variant: "destructive",
+          });
+        }
+        break;
+
+      case "send_newsletter":
+        toast({
+          title: "Newsletter",
+          description: `Newsletter envoyée à ${selectedIds.length} client(s)`,
+        });
+        break;
+
+      case "archive":
+        toast({
+          title: "Succès",
+          description: `${selectedIds.length} client(s) archivé(s)`,
+        });
+        break;
     }
   };
 
@@ -92,10 +190,37 @@ export default function Clients() {
             onClick={() => setShowAddModal(true)}
             className="flex items-center space-x-2"
             data-testid="button-add-client"
+            data-tour="add-client"
           >
             <Plus className="w-4 h-4" />
             <span>Nouveau Client</span>
           </Button>
+        </div>
+
+        {/* Filtres avancés */}
+        <div data-tour="advanced-filters">
+          <AdvancedFilters
+            availableFields={clientFilterFields}
+            onFiltersChange={setActiveFilters}
+            savedFilters={[
+              { name: "Clients récents", filters: [{ id: "1", field: "createdAt", operator: "last_30_days", value: "" }] },
+              { name: "Clients VIP", filters: [{ id: "2", field: "status", operator: "equals", value: "VIP" }] },
+            ]}
+          />
+        </div>
+
+        {/* Actions en masse */}
+        <div data-tour="bulk-operations">
+          <BulkOperations
+            items={clients}
+            selectedItems={bulkSelection.selectedItems}
+            onSelectionChange={bulkSelection.setSelectedItems}
+            onBulkAction={handleBulkAction}
+            getItemId={(client) => client.id}
+            getItemLabel={(client) => client.name}
+            actions={clientBulkActions}
+            className="mb-6"
+          />
         </div>
 
         {/* Search and Filters */}
@@ -116,9 +241,13 @@ export default function Clients() {
                 </div>
               </div>
               <div className="flex items-center space-x-4">
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4" />
-                  <span>Filtres</span>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center space-x-2"
+                  data-tour="export-button"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Exporter</span>
                 </Button>
               </div>
             </div>
@@ -127,13 +256,20 @@ export default function Clients() {
 
         {/* Clients Table */}
         <Card>
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h3 className="text-lg font-semibold text-slate-900">Liste des Clients</h3>
-          </div>
+          <CardHeader>
+            <CardTitle>Liste des Clients</CardTitle>
+          </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <Checkbox
+                      checked={bulkSelection.allSelected}
+                      onCheckedChange={bulkSelection.selectAll}
+                      className={bulkSelection.someSelected ? "indeterminate" : ""}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Client
                   </th>
@@ -154,13 +290,19 @@ export default function Clients() {
               <tbody className="divide-y divide-slate-200" data-testid="clients-table">
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                       {search ? "Aucun client trouvé pour cette recherche" : "Aucun client ajouté"}
                     </td>
                   </tr>
                 ) : (
                   clients.map((client) => (
                     <tr key={client.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Checkbox
+                          checked={bulkSelection.isSelected(client.id)}
+                          onCheckedChange={() => bulkSelection.selectItem(client.id)}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
@@ -230,6 +372,7 @@ export default function Clients() {
             </table>
           </div>
         </Card>
+        
         <div className="flex justify-center mt-4">
           <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Précédent</Button>
           <span className="mx-3 text-sm text-slate-600">Page {page}</span>

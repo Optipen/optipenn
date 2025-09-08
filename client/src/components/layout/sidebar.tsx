@@ -13,12 +13,12 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col" data-testid="sidebar">
+    <div className="w-64 bg-white border-r border-slate-200 flex flex-col" data-testid="sidebar" data-tour="sidebar">
       <div className="p-6 border-b border-slate-200">
         <h1 className="text-xl font-bold text-slate-900" data-testid="app-title">
-          Gestion Devis
+          Optipenn CRM
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Suivi des relances</p>
+        <p className="text-sm text-slate-500 mt-1">Gestion intelligente</p>
       </div>
       
       <nav className="flex-1 p-4 space-y-2" data-testid="navigation">
