@@ -2,6 +2,13 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, decimal, date, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { 
+  strictEmailValidation, 
+  strictAmountValidation, 
+  strictDateValidation, 
+  optionalStrictDateValidation,
+  pastDateValidation
+} from "./validation-utils";
 
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -52,7 +59,7 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 }).extend({
   name: z.string().min(1, "Le nom est requis"),
   company: z.string().min(1, "L'entreprise est requise"),
-  email: z.string().email("Email invalide").min(1, "L'email est requis"),
+  email: strictEmailValidation,
   phone: z.string().optional(),
   position: z.string().optional(),
 });
@@ -64,23 +71,11 @@ export const insertQuoteSchema = createInsertSchema(quotes).omit({
   reference: z.string().min(1, "La référence est requise"),
   clientId: z.string().min(1, "Le client est requis"),
   description: z.string().min(1, "La description est requise"),
-  amount: z
-    .string()
-    .min(1, "Le montant est requis")
-    .regex(/^\d+(\.\d{1,2})?$/, "Montant invalide (ex: 12000.00)"),
-  sentDate: z
-    .string()
-    .min(1, "La date d'envoi est requise")
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)"),
+  amount: strictAmountValidation,
+  sentDate: pastDateValidation,
   notes: z.string().optional(),
-  plannedFollowUpDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)")
-    .optional(),
-  acceptedAt: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)")
-    .optional(),
+  plannedFollowUpDate: optionalStrictDateValidation,
+  acceptedAt: optionalStrictDateValidation,
 });
 
 export const insertFollowUpSchema = createInsertSchema(followUps).omit({
@@ -94,7 +89,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   passwordHash: true,
 }).extend({
   name: z.string().min(1, "Le nom est requis"),
-  email: z.string().email("Email invalide").min(1, "L'email est requis"),
+  email: strictEmailValidation,
   password: z.string().min(8, "Mot de passe trop court (min 8)")
     .regex(/[A-Z]/, "Doit contenir une majuscule")
     .regex(/[a-z]/, "Doit contenir une minuscule")

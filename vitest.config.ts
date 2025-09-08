@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['server/__tests__/**/*.test.ts'],
+    include: ['server/__tests__/**/*.test.ts', 'shared/__tests__/**/*.test.ts'],
     watch: false,
     pool: 'threads',
   },
