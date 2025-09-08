@@ -71,6 +71,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", strictLoginLimiter, loginLimiter, login);
   app.post("/api/auth/logout", csrfProtect, logout);
 
+  // CSRF token endpoint - returns current token for authenticated users
+  app.get("/api/csrf-token", requireAuth(), (req, res) => {
+    const csrfToken = (req as any).cookies?.["csrf_token"];
+    if (!csrfToken) {
+      return res.status(401).json({ message: "Token CSRF non disponible" });
+    }
+    res.json({ token: csrfToken });
+  });
+
   // Status endpoint - shows demo mode banner
   app.get("/api/status", (req, res) => {
     const isDemoMode = process.env.DEMO_MODE === "1";

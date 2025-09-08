@@ -28,6 +28,71 @@ export async function apiRequest(
   return res;
 }
 
+/**
+ * Fetches the current CSRF token from the server
+ * This is useful when the CSRF token cookie is not available or expired
+ */
+export async function fetchCsrfToken(): Promise<string> {
+  const res = await fetch('/api/csrf-token', {
+    credentials: 'include',
+  });
+  
+  if (!res.ok) {
+    throw new Error(`Failed to fetch CSRF token: ${res.status} ${res.statusText}`);
+  }
+  
+  const data = await res.json();
+  if (!data.token) {
+    throw new Error('CSRF token not found in response');
+  }
+  
+  return data.token;
+}
+
+/**
+ * Enhanced API request function that can fetch CSRF token if not available in cookies
+ */
+export async function apiRequestWithCsrfFallback(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Try to get CSRF token from cookie first
+  let csrfToken: string | undefined;
+  try {
+    csrfToken = document.cookie.split('; ').find((c) => c.startsWith('csrf_token='))?.split('=')[1];
+    if (csrfToken) {
+      csrfToken = decodeURIComponent(csrfToken);
+    }
+  } catch {}
+  
+  // If no CSRF token in cookie and this is a state-changing request, fetch it from server
+  if (!csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    try {
+      csrfToken = await fetchCsrfToken();
+    } catch (error) {
+      console.warn('Failed to fetch CSRF token from server:', error);
+      // Continue without CSRF token - let the server handle the error
+    }
+  }
+  
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+  
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
+
+  await throwIfResNotOk(res);
+  return res;
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn = <T = any>(options: {
   on401: UnauthorizedBehavior;
