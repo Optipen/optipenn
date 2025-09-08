@@ -1,33 +1,65 @@
 CRM Devis & Relances
 
-Prérequis
+**Système de gestion de devis et relances clients moderne et sécurisé.**
+
+## 🚀 Prérequis
 - Node 18+
-- Base PostgreSQL (Neon/Render/Local). SQLite fallback non inclus ici.
+- Base PostgreSQL (Neon/Render/Local). SQLite fallback non inclus.
 
-Installation
-1. Copier .env.example vers .env et définir les variables.
-2. Installer dépendances:
+## 📦 Installation Rapide
+1. **Configurer l'environnement :**
+   ```bash
+   cp .env.example .env
+   # Éditer .env avec vos valeurs
+   ```
+2. **Installer les dépendances :**
+   ```bash
    npm install
-3. Pousser le schéma (Drizzle):
+   ```
+3. **Configurer la base de données :**
+   ```bash
    npm run db:push
-4. Seed (optionnel):
+   ```
+4. **Peupler avec des données de test (optionnel) :**
+   ```bash
    npm run seed
-5. Démarrer en dev:
+   ```
+5. **Démarrer en développement :**
+   ```bash
    npm run dev
+   ```
 
-Variables d'environnement (.env)
+## 📋 Variables d'Environnement
+
 **⚠️ VALIDATION OBLIGATOIRE ⚠️**
 
 L'application valide automatiquement toutes les variables d'environnement au démarrage. Les variables sensibles sont obligatoires et doivent respecter des critères de sécurité.
 
-**Variables obligatoires:**
-- DATABASE_URL=postgres://user:pass@host/db (URL de connexion PostgreSQL)
-- JWT_SECRET=your-secret-key (32+ caractères en production)
+Consultez [`.env.example`](./.env.example) pour la liste complète et la documentation de chaque variable.
 
-**Variables optionnelles:**
-- SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM (email)
-- CORS_ORIGIN, COOKIE_DOMAIN (sécurité)
-- SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD (initialisation)
+**Variables critiques :**
+- `DATABASE_URL` - Connexion PostgreSQL
+- `JWT_SECRET` - Clé de chiffrement (32+ caractères en production)
+
+## 📁 Structure du Projet
+
+```
+optipenn/
+├── client/           # Interface React (TypeScript)
+├── server/           # API Express (TypeScript)  
+├── shared/           # Schémas et validations partagés
+├── docs/             # Documentation technique
+└── package.json      # Configuration npm
+```
+
+## 📚 Documentation
+
+La documentation complète se trouve dans le dossier [`docs/`](./docs/) :
+
+- [**Analyse de Qualité**](./docs/CODE_QUALITY_ANALYSIS.md) - Évaluation du code et recommandations
+- [**Sécurité**](./docs/SECURITY.md) - Guide sécurité et bonnes pratiques
+- [**Performance**](./docs/PERFORMANCE_IMPROVEMENTS.md) - Optimisations implémentées
+- [**Plus de docs...**](./docs/README.md) - Index complet de la documentation
 
 **Configuration:**
 1. Copiez .env.example vers .env
