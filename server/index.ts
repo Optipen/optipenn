@@ -121,6 +121,28 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     process.exit(1);
   }
 
+  // Demo mode initialization
+  if (process.env.DEMO_MODE === "1") {
+    try {
+      const { generateDemoData } = await import("./demo-data");
+      const { storage } = await import("./storage");
+      
+      console.log("🎭 Initialisation du mode démo avec données d'exemple...");
+      
+      const demoData = await generateDemoData(storage);
+      
+      console.log(`✓ Mode démo initialisé avec ${demoData.clients.length} clients, ${demoData.quotes.length} devis, ${demoData.followUps.length} relances`);
+      logger.info("Demo mode initialized", {
+        clients: demoData.clients.length,
+        quotes: demoData.quotes.length,
+        followUps: demoData.followUps.length
+      });
+    } catch (error) {
+      console.warn("⚠️ Échec de l'initialisation des données démo:", (error as Error).message);
+      logger.warn("Failed to initialize demo data", { error: (error as Error).message });
+    }
+  }
+
   const server = await registerRoutes(app);
   
   // start schedulers
@@ -169,11 +191,26 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen(port, () => {
+    const isDemoMode = process.env.DEMO_MODE === "1";
     const message = `Server running on port ${port} in ${process.env.NODE_ENV || 'development'} mode`;
+    
     log(`serving on port ${port}`);
+    
+    if (isDemoMode) {
+      console.log("\n" + "=".repeat(60));
+      console.log("🎭 MODE DÉMO ACTIVÉ - NE PAS UTILISER EN PRODUCTION");
+      console.log("=".repeat(60));
+      console.log(`📍 Accès: http://localhost:${port}`);
+      console.log("👤 Auto-connexion: Admin Demo (admin@example.com)");
+      console.log("💾 Données temporaires en mémoire");
+      console.log("⚠️  Toutes les données seront perdues au redémarrage");
+      console.log("=".repeat(60) + "\n");
+    }
+    
     logger.info(message, { 
       port, 
       environment: process.env.NODE_ENV || 'development',
+      demoMode: isDemoMode,
       pid: process.pid
     });
   });

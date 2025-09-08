@@ -138,6 +138,7 @@ export interface ValidationResult {
  */
 export function validateEnvironmentVariables(): ValidationResult {
   const currentMode = getCurrentEnvironmentMode();
+  const isDemoMode = process.env.DEMO_MODE === "1";
   const errors: string[] = [];
   const warnings: string[] = [];
   let validated = 0;
@@ -145,10 +146,22 @@ export function validateEnvironmentVariables(): ValidationResult {
   let invalid = 0;
   let sensitiveCount = 0;
 
-  console.log(`[ENV-VALIDATION] Validation des variables d'environnement en mode: ${currentMode}`);
+  if (isDemoMode) {
+    console.log(`[ENV-VALIDATION] 🎭 MODE DÉMO ACTIVÉ - Validation allégée des variables d'environnement`);
+  } else {
+    console.log(`[ENV-VALIDATION] Validation des variables d'environnement en mode: ${currentMode}`);
+  }
 
   for (const rule of ENV_RULES) {
     const value = process.env[rule.name];
+    
+    // Skip validation of certain variables in demo mode
+    if (isDemoMode && ["DATABASE_URL", "JWT_SECRET"].includes(rule.name)) {
+      warnings.push(`Variable ${rule.name} ignorée en mode démo`);
+      validated++;
+      continue;
+    }
+    
     const isRequired = rule.required || (rule.requiredInModes && rule.requiredInModes.includes(currentMode));
     
     if (rule.sensitive) {
@@ -188,7 +201,9 @@ export function validateEnvironmentVariables(): ValidationResult {
   }
 
   // Vérifications spéciales pour les groupes de variables
-  validateSMTPConfiguration(errors, warnings);
+  if (!isDemoMode) {
+    validateSMTPConfiguration(errors, warnings);
+  }
 
   const result: ValidationResult = {
     valid: errors.length === 0,
@@ -224,6 +239,13 @@ export function validateEnvironmentVariables(): ValidationResult {
  * Les variables SMTP doivent être présentes ensemble ou absentes ensemble
  */
 function validateSMTPConfiguration(errors: string[], warnings: string[]): void {
+  const isDemoMode = process.env.DEMO_MODE === "1";
+  
+  // Skip SMTP validation in demo mode
+  if (isDemoMode) {
+    return;
+  }
+  
   const smtpVars = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
   const presentVars = smtpVars.filter(name => process.env[name]);
   const mode = getCurrentEnvironmentMode();

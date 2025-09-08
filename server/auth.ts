@@ -45,6 +45,22 @@ function getCookieMaxAge(): number {
 
 export function requireAuth(roles?: Array<"admin" | "manager" | "sales">) {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Demo mode bypass - inject demo user
+    if (process.env.DEMO_MODE === "1") {
+      (req as any).user = {
+        sub: "demo-user",
+        role: "admin",
+        name: "Admin Demo",
+        email: "admin@example.com"
+      };
+      // Check role authorization if specified
+      if (roles && roles.length > 0 && !roles.includes("admin")) {
+        return res.status(403).json({ message: "Accès interdit" });
+      }
+      next();
+      return;
+    }
+
     const token = (req.cookies && req.cookies[COOKIE_NAME]) || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : undefined);
     if (!token) return res.status(401).json({ message: "Non authentifié" });
     try {

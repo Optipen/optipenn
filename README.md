@@ -29,6 +29,34 @@ CRM Devis & Relances
    npm run dev
    ```
 
+## 🎭 Mode Démo
+
+**Lancement ultra-rapide sans configuration !**
+
+Le mode démo permet de tester l'application instantanément sans base de données, sans variables d'environnement, et sans configuration.
+
+```bash
+# Installation et démarrage en une commande
+npm install && npm run demo
+```
+
+**Fonctionnalités du mode démo :**
+- ✅ Aucune configuration requise (pas de .env, pas de DATABASE_URL)
+- ✅ Données d'exemple automatiquement chargées en mémoire
+- ✅ Auto-connexion en tant qu'admin (admin@example.com)
+- ✅ Stockage temporaire en mémoire (SQLite/PostgreSQL non requis)
+- ✅ Données cohérentes : clients, devis, suivis avec dates récentes
+- ⚠️ **ATTENTION** : Toutes les données disparaissent au redémarrage
+
+**Accès :**
+- URL : `http://localhost:5000`
+- Utilisateur automatique : Admin Demo (admin@example.com)
+- Statut : `GET /api/status` affiche une bannière de mode démo
+
+**Note importante :** Le mode démo est uniquement destiné à la démonstration. N'utilisez jamais `DEMO_MODE=1` en production.
+
+---
+
 ## 📋 Variables d'Environnement
 
 **⚠️ VALIDATION OBLIGATOIRE ⚠️**
