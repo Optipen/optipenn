@@ -23,20 +23,18 @@
  * - Sharp (for image processing)
  * 
  * Usage:
- *     node test-optipenn-app.js [--module MODULE_NAME]
+ *     node test-optipenn-app.cjs [--module MODULE_NAME]
  *     
  * Example:
- *     node test-optipenn-app.js                    # Run all tests
- *     node test-optipenn-app.js --module login     # Run only login tests
- *     node test-optipenn-app.js --module dashboard # Run only dashboard tests
+ *     node test-optipenn-app.cjs                    # Run all tests
+ *     node test-optipenn-app.cjs --module login     # Run only login tests
+ *     node test-optipenn-app.cjs --module dashboard # Run only dashboard tests
  */
 
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
-
-const __dirname = __dirname || path.dirname(require.main.filename);
 
 // Configuration
 const CONFIG = {

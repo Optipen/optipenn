@@ -244,7 +244,7 @@ For enterprise readiness, aim for:
 ## Files Overview
 
 - `test_optipenn_app.py` - Comprehensive Python/Selenium test suite
-- `test-optipenn-app.js` - Comprehensive JavaScript/Playwright test suite  
+- `test-optipenn-app.cjs` - Comprehensive JavaScript/Playwright test suite  
 - `test-basic.cjs` - Simple functionality validator
 - `demo-test-suite.cjs` - Demo report generator
 - `run-tests.sh` - Automated setup and execution script
