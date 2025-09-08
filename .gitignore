@@ -3,4 +3,21 @@ dist
 .DS_Store
 server/public
 vite.config.ts.*
-*.tar.gzclient/__tests__/
+*.tar.gz
+
+# Test files and coverage
+client/__tests__/
+coverage/
+*.test.log
+
+# Temporary files
+.tmp/
+temp/
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# Log files
+*.log
+logs/
