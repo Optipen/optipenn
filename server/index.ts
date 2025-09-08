@@ -9,6 +9,23 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+// Add security headers for production
+if (process.env.NODE_ENV === "production") {
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Prevent clickjacking
+    res.setHeader("X-Frame-Options", "DENY");
+    // Prevent MIME type sniffing
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Enable XSS protection
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    // Referrer policy for privacy
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // Content Security Policy for cookie protection
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+    next();
+  });
+}
 // CORS if needed (configure origin via env)
 const allowOrigin = process.env.CORS_ORIGIN;
 if (allowOrigin) {
