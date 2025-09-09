@@ -53,21 +53,12 @@ export default function Clients() {
   const [activeFilters, setActiveFilters] = useState<any[]>([]);
   const { toast } = useToast();
 
-  // Gestion des sélections en masse
-  const bulkSelection = useBulkSelection([], (client: Client) => client.id);
-
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients", { search, page, pageSize, filters: activeFilters }],
   });
 
-  // Mettre à jour la sélection quand les clients changent
-  useEffect(() => {
-    bulkSelection.setSelectedItems(
-      bulkSelection.selectedItems.filter(id => 
-        clients.some(client => client.id === id)
-      )
-    );
-  }, [clients]);
+  // Gestion des sélections en masse
+  const bulkSelection = useBulkSelection(clients, (client: Client) => client.id);
 
   const deleteClientMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/clients/${id}`),
