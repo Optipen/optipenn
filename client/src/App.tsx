@@ -3,7 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Sidebar from "@/components/layout/sidebar";
+import ModernSidebarWrapper from "@/components/layout/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import Dashboard from "@/pages/dashboard";
 import Clients from "@/pages/clients";
 import Quotes from "@/pages/quotes";
@@ -57,27 +58,29 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ErrorBoundary>
-          <div className="flex h-screen bg-slate-50">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Header avec recherche globale et notifications */}
-              <header className="bg-white border-b border-slate-200 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 max-w-md" data-tour="global-search">
-                    <GlobalSearch />
+          <SidebarProvider>
+            <div className="flex h-screen bg-slate-50">
+              <ModernSidebarWrapper />
+              <SidebarInset className="flex-1 flex flex-col overflow-hidden">
+                {/* Header avec recherche globale et notifications */}
+                <header className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 max-w-md" data-tour="global-search">
+                      <GlobalSearch />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <NotificationCenter />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <NotificationCenter />
-                  </div>
+                </header>
+                
+                {/* Contenu principal */}
+                <div className="flex-1 overflow-auto">
+                  <Router />
                 </div>
-              </header>
-              
-              {/* Contenu principal */}
-              <div className="flex-1 overflow-auto">
-                <Router />
-              </div>
+              </SidebarInset>
             </div>
-          </div>
+          </SidebarProvider>
           
           {/* Tour guidé pour nouveaux utilisateurs */}
           {shouldShowTour && (
