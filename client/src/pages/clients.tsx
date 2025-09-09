@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Filter, Plus, Edit, Eye, Trash2, Download, Mail, Archive } from "lucide-react";
+import { Search, Filter, Plus, Edit, Eye, Trash2, Download, Mail, Archive, Users } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AddClientModal from "@/components/modals/add-client-modal";
@@ -254,124 +260,151 @@ export default function Clients() {
           </CardContent>
         </Card>
 
-        {/* Clients Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Liste des Clients</CardTitle>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <Checkbox
-                      checked={bulkSelection.allSelected}
-                      onCheckedChange={bulkSelection.selectAll}
-                      className={bulkSelection.someSelected ? "indeterminate" : ""}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Entreprise
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200" data-testid="clients-table">
-                {clients.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                      {search ? "Aucun client trouvé pour cette recherche" : "Aucun client ajouté"}
-                    </td>
-                  </tr>
-                ) : (
-                  clients.map((client) => (
-                    <tr key={client.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Checkbox
-                          checked={bulkSelection.isSelected(client.id)}
-                          onCheckedChange={() => bulkSelection.selectItem(client.id)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-600">
-                              {getInitials(client.name)}
-                            </span>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-slate-900" data-testid={`client-name-${client.id}`}>
-                              {client.name}
-                            </div>
-                            <div className="text-sm text-slate-500">{client.position}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900" data-testid={`client-company-${client.id}`}>
-                        {client.company}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-900" data-testid={`client-email-${client.id}`}>
-                          {client.email}
-                        </div>
-                        {client.phone && (
-                          <div className="text-sm text-slate-500" data-testid={`client-phone-${client.id}`}>
-                            {client.phone}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge className="bg-green-100 text-green-800">Actif</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-blue-600 hover:text-blue-700"
-                            onClick={() => handleOpenEdit(client)}
-                            data-testid={`button-edit-${client.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
+        {/* Clients Cards Grid */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Liste des Clients</h3>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                checked={bulkSelection.allSelected}
+                onCheckedChange={bulkSelection.selectAll}
+                className={bulkSelection.someSelected ? "indeterminate" : ""}
+              />
+              <span className="text-sm text-slate-600">Sélectionner tout</span>
+            </div>
+          </div>
+          
+          {clients.length === 0 ? (
+            <Card className="p-12">
+              <div className="text-center text-slate-500">
+                <Users className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  {search ? "Aucun client trouvé" : "Aucun client ajouté"}
+                </h3>
+                <p className="text-slate-500">
+                  {search 
+                    ? "Essayez de modifier vos critères de recherche" 
+                    : "Commencez par ajouter votre premier client"}
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="clients-table">
+              {clients.map((client) => (
+                <Card key={client.id} className="group hover:shadow-lg transition-all duration-200 border border-slate-200 hover:border-slate-300">
+                  <CardContent className="p-6">
+                    {/* Header avec checkbox et actions */}
+                    <div className="flex items-start justify-between mb-4">
+                      <Checkbox
+                        checked={bulkSelection.isSelected(client.id)}
+                        onCheckedChange={() => bulkSelection.selectItem(client.id)}
+                        className="mt-1"
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="sr-only">Ouvrir le menu</span>
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="1"/>
+                              <circle cx="12" cy="5" r="1"/>
+                              <circle cx="12" cy="19" r="1"/>
+                            </svg>
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-slate-600 hover:text-slate-700"
-                            data-testid={`button-view-${client.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600 hover:text-red-700"
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEdit(client)} data-testid={`button-edit-${client.id}`}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem data-testid={`button-view-${client.id}`}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Voir les détails
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
                             onClick={() => handleDeleteClient(client.id, client.name)}
                             disabled={deleteClientMutation.isPending}
                             data-testid={`button-delete-${client.id}`}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    {/* Avatar et informations principales */}
+                    <div className="flex items-center space-x-4 mb-4">
+                      <div className="relative">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                          <span className="text-lg font-semibold text-white">
+                            {getInitials(client.name)}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-lg font-semibold text-slate-900 truncate" data-testid={`client-name-${client.id}`}>
+                          {client.name}
+                        </h4>
+                        <p className="text-sm text-slate-500 truncate">{client.position}</p>
+                      </div>
+                    </div>
+
+                    {/* Informations de l'entreprise */}
+                    <div className="mb-4">
+                      <div className="flex items-center text-sm text-slate-600 mb-1">
+                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 21h18"/>
+                          <path d="M5 21V7l8-4v18"/>
+                          <path d="M19 21V11l-6-4"/>
+                        </svg>
+                        <span className="font-medium" data-testid={`client-company-${client.id}`}>
+                          {client.company}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Informations de contact */}
+                    <div className="space-y-2 mb-4">
+                      <a 
+                        href={`mailto:${client.email}`}
+                        className="flex items-center text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                        data-testid={`client-email-${client.id}`}
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        <span className="truncate">{client.email}</span>
+                      </a>
+                      {client.phone && (
+                        <a 
+                          href={`tel:${client.phone}`}
+                          className="flex items-center text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                          data-testid={`client-phone-${client.id}`}
+                        >
+                          <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                          </svg>
+                          <span>{client.phone}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Statut */}
+                    <div className="flex items-center justify-between">
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                        Actif
+                      </Badge>
+                      <span className="text-xs text-slate-400">
+                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString('fr-FR') : 'N/A'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
         
         <div className="flex justify-center mt-4">
           <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Précédent</Button>
