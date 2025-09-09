@@ -168,6 +168,7 @@ class OptipennTester {
         this.testResults = [];
         this.startTime = new Date();
         this.logger = console;
+        this.userDataDir = null;
     }
     
     async setupDirectories() {
@@ -197,7 +198,8 @@ class OptipennTester {
             // Start the application
             this.serverProcess = spawn('npm', ['run', 'demo'], {
                 cwd: process.cwd(),
-                stdio: ['pipe', 'pipe', 'pipe']
+                stdio: ['pipe', 'pipe', 'pipe'],
+                env: { ...process.env, DEMO_MODE: '1' }
             });
             
             // Wait for server to start
@@ -228,17 +230,22 @@ class OptipennTester {
     
     async setupBrowser() {
         try {
+            // Use unique user data directory to avoid conflicts
+            this.userDataDir = path.join(__dirname, 'browser_data', `session_${Date.now()}`);
+            
             this.browser = await chromium.launch({
-                headless: false, // Set to true for headless mode
-                args: ['--no-sandbox', '--disable-dev-shm-usage']
+                headless: true, // Use headless mode for CI/testing environment
+                args: [
+                    '--no-sandbox', 
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--allow-running-insecure-content'
+                ]
             });
             
             this.context = await this.browser.newContext({
-                viewport: CONFIG.VIEWPORTS.desktop,
-                recordVideo: {
-                    dir: CONFIG.SCREENSHOT_DIR,
-                    size: CONFIG.VIEWPORTS.desktop
-                }
+                viewport: CONFIG.VIEWPORTS.desktop
             });
             
             this.page = await this.context.newPage();
@@ -1210,6 +1217,22 @@ class OptipennTester {
             if (this.browser) {
                 await this.browser.close();
                 this.logger.info('Browser closed');
+            }
+            
+            // Cleanup browser data directory
+            if (this.userDataDir) {
+                try {
+                    const rimraf = await import('rimraf');
+                    await rimraf.rimraf(this.userDataDir);
+                    this.logger.info('Browser data directory cleaned up');
+                } catch (error) {
+                    // Fallback manual cleanup
+                    try {
+                        await fs.rmdir(this.userDataDir, { recursive: true });
+                    } catch (e) {
+                        this.logger.warn('Could not cleanup browser data directory:', e.message);
+                    }
+                }
             }
             
             if (this.serverProcess) {
